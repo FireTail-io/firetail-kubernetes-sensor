@@ -78,11 +78,11 @@ func HelloServer(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	const TARGET_PORT = 8080
+	const TARGET_PORT = 80
 
 	// Start a simple HTTP server so we can send some requests to it
 	http.HandleFunc("/", HelloServer)
-	go http.ListenAndServe(":8080", nil)
+	go http.ListenAndServe(":80", nil)
 
 	// Create a raw socket to listen for TCP packets
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_TCP)
@@ -94,7 +94,7 @@ func main() {
 	// Apply a BPF filter to the socket
 	err = Filter{
 		bpf.LoadAbsolute{Off: 22, Size: 2},         // load the destination port
-		bpf.JumpIf{Val: TARGET_PORT, SkipFalse: 1}, // if Val != 8080 skip next instruction
+		bpf.JumpIf{Val: TARGET_PORT, SkipFalse: 1}, // if Val != TARGET_PORT skip next instruction
 		bpf.RetConstant{Val: 0xffff},               // return 0xffff bytes (or less) from packet
 		bpf.RetConstant{Val: 0x0},                  // return 0 bytes, effectively ignore this packet
 	}.ApplyTo(fd)

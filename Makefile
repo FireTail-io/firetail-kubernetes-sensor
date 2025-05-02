@@ -4,7 +4,7 @@ build:
 
 .PHONY: publish
 run: build
-	docker run -p 8080:8080 firetail/kubernetes-sensor
+	docker run -p 8080:80 firetail/kubernetes-sensor
 
 .PHONY: publish
 publish: build
