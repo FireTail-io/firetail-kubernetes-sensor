@@ -10,6 +10,7 @@ Clone the repo, then use the `run` target in [the provided makefile](./Makefile)
 
 ```bash
 git clone git@github.com:FireTail-io/firetail-kubernetes-sensor.git
+cd firetail-kubernetes-sensor
 make run
 ```
 
