@@ -1,10 +1,16 @@
 # Firetail Kubernetes Sensor
 
-Quickstart:
+POC for a FireTail Kubernetes Sensor.
+
+
+
+## Quickstart
+
+Clone the repo, then use the `run` target in [the provided makefile](./Makefile):
 
 ```bash
 git clone git@github.com:FireTail-io/firetail-kubernetes-sensor.git
-docker build . -t firetail-kubernetes-sensor && docker run -p 8080:8080 firetail-kubernetes-sensor
+make run
 ```
 
 In another terminal:
@@ -37,4 +43,14 @@ Accept: */*
 2025/05/02 13:27:16 😭 Failed to parse packet no payload found in TCP layer
 2025/05/02 13:27:16 😭 Failed to parse packet no payload found in TCP layer
 2025/05/02 13:27:16 😭 Failed to parse packet no payload found in TCP layer
+```
+
+
+
+## Publishing to ECS
+
+The `publish` target in [the provided makefile](./Makefile) will login to ECS, tag the image and push it:
+
+```bash
+make publish
 ```
