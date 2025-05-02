@@ -1,32 +1,27 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: ebpf-daemonset
+  name: firetail-ebpf-daemonset
   namespace: default
 spec:
   selector:
     matchLabels:
-      name: ebpf-daemonset
+      name: firetail-ebpf-daemonset
   template:
     metadata:
       labels:
-        name: ebpf-daemonset
+        name: firetail-ebpf-daemonset
     spec:
       containers:
-      - name: ebpf-daemonset
-        image: rhs95/ebpf-probe
-        imagePullPolicy: IfNotPresent  # add this line
+      - name: firetail-ebpf-daemonset
+        image: firetail-kubernetes-sensor  # TODO: Change to the actual image name
+        imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
         volumeMounts:
-        - name: lib-modules
-          mountPath: /lib/modules
-        - name: usr-src
-          mountPath: /usr/src
+        - name: dist
+          mountPath: /dist
       volumes:
-      - name: lib-modules
+      - name: dist
         hostPath:
-          path: /lib/modules
-      - name: usr-src
-        hostPath:
-          path: /usr/src
+          path: /dist
