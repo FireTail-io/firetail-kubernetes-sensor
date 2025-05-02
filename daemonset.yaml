@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: firetail-ebpf-daemonset
-        image: firetail-kubernetes-sensor  # TODO: Change to the actual image name
+        image: firetail/kubernetes-sensor  # TODO: Change to the actual image name
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
