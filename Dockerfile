@@ -4,6 +4,6 @@ COPY go.mod ./
 COPY go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o main .
-RUN chmod +x main
-CMD ["./main"]
+RUN go build -o /dist/main .
+RUN chmod +x /dist/main
+CMD ["/dist/main"]
