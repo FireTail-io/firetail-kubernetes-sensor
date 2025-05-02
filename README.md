@@ -27,7 +27,7 @@ Hello, world!
 
 And the docker container should have logs similar to the following:
 
-```bash
+```text
 2025/05/02 13:27:15 🧐 Listening for packets on port 8080...
 2025/05/02 13:27:16 😭 Failed to parse packet no payload found in TCP layer
 2025/05/02 13:27:16 😭 Failed to parse packet no payload found in TCP layer
@@ -49,8 +49,9 @@ Accept: */*
 
 ## Publishing to ECS
 
-The `publish` target in [the provided makefile](./Makefile) will login to ECS, tag the image and push it:
+Authenticate and then use the `publish` target in [the provided makefile](./Makefile) to login to ECS, tag the image and push it:
 
 ```bash
+ftauth
 make publish
 ```
