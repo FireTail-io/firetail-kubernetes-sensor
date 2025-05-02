@@ -1,6 +1,6 @@
 .PHONY: build
 build:
-	docker build . -t firetail/kubernetes-sensor
+	GOARCH=amd64 GOOS=linux docker build . -t firetail/kubernetes-sensor
 
 .PHONY: publish
 run: build
