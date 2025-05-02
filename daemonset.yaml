@@ -14,14 +14,19 @@ spec:
     spec:
       containers:
       - name: firetail-ebpf-daemonset
-        image: firetail/kubernetes-sensor  # TODO: Change to the actual image name
+        image: 799185653336.dkr.ecr.eu-west-1.amazonaws.com/firetail/kubernetes-sensor:latest
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
         volumeMounts:
-        - name: dist
-          mountPath: /dist
+        - name: lib-modules
+          mountPath: /lib/modules
+        - name: usr-src
+          mountPath: /usr/src
       volumes:
-      - name: dist
+      - name: lib-modules
         hostPath:
-          path: /dist
+          path: /lib/modules
+      - name: usr-src
+        hostPath:
+          path: /usr/src
