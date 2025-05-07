@@ -29,21 +29,17 @@ Hello, world!
 And the docker container should have logs similar to the following:
 
 ```text
-2025/05/02 13:27:15 🧐 Listening for packets on port 8080...
-2025/05/02 13:27:16 😭 Failed to parse packet no payload found in TCP layer
-2025/05/02 13:27:16 😭 Failed to parse packet no payload found in TCP layer
-2025/05/02 13:27:16 ✅ Received packet from 172.17.0.1:42812 to 172.17.0.3:8080 with payload:
-----------START----------
-GET /world HTTP/1.1
-Host: localhost:8080
-User-Agent: curl/8.7.1
-Accept: */*
-
-
------------END-----------
-2025/05/02 13:27:16 😭 Failed to parse packet no payload found in TCP layer
-2025/05/02 13:27:16 😭 Failed to parse packet no payload found in TCP layer
-2025/05/02 13:27:16 😭 Failed to parse packet no payload found in TCP layer
+2025/05/07 16:23:11 🔍 Starting local HTTP server...
+2025/05/07 16:23:11 🔍 Starting HTTP request streamer...
+2025/05/07 16:23:11 🔍 Starting HTTP request & response logger...
+2025/05/07 16:23:14 📡 Captured HTTP request & response: 
+        Request: GET /world 
+        Response: 200 OK 
+        Host: localhost:8080 
+        Request Body:  
+        Response Body: Hello, world! 
+        Request Headers: map[Accept:[*/*] User-Agent:[curl/8.7.1]] 
+        Response Headers: map[Content-Length:[13] Content-Type:[text/plain; charset=utf-8] Date:[Wed, 07 May 2025 16:23:14 GMT]]
 ```
 
 
