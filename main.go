@@ -1,127 +1,209 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"golang.org/x/net/bpf"
-	"golang.org/x/sys/unix"
-
-	"syscall"
-	"unsafe"
+	"github.com/google/gopacket/pcap"
+	"github.com/google/gopacket/tcpassembly"
+	"github.com/google/gopacket/tcpassembly/tcpreader"
 )
 
-// Adapted from https://www.bytesizego.com/blog/golang-byte-to-string
-
-// Filter represents a classic BPF filter program that can be applied to a socket
-type Filter []bpf.Instruction
-
-// ApplyTo applies the current filter onto the provided file descriptor
-func (filter Filter) ApplyTo(fd int) (err error) {
-	var assembled []bpf.RawInstruction
-	if assembled, err = bpf.Assemble(filter); err != nil {
-		return err
-	}
-
-	var program = unix.SockFprog{
-		Len:    uint16(len(assembled)),
-		Filter: (*unix.SockFilter)(unsafe.Pointer(&assembled[0])),
-	}
-	var b = (*[unix.SizeofSockFprog]byte)(unsafe.Pointer(&program))[:unix.SizeofSockFprog]
-
-	if _, _, errno := syscall.Syscall6(syscall.SYS_SETSOCKOPT,
-		uintptr(fd), uintptr(syscall.SOL_SOCKET), uintptr(syscall.SO_ATTACH_FILTER),
-		uintptr(unsafe.Pointer(&b[0])), uintptr(len(b)), 0); errno != 0 {
-		return errno
-	}
-
-	return nil
+type httpRequestAndResponse struct {
+	request  *http.Request
+	response *http.Response
 }
 
-func parsePacket(data []byte) (*layers.IPv4, *layers.TCP, error) {
-	packet := gopacket.NewPacket(data, layers.LayerTypeIPv4, gopacket.Default)
-	if errLayer := packet.ErrorLayer(); errLayer != nil {
-		return nil, nil, fmt.Errorf("error decoding packet: %w", errLayer.Error())
-	}
-
-	ipLayer := packet.Layer(layers.LayerTypeIPv4)
-	if ipLayer == nil {
-		return nil, nil, fmt.Errorf("no IPv4 layer found")
-	}
-
-	ip, _ := ipLayer.(*layers.IPv4)
-	if ip == nil {
-		return nil, nil, fmt.Errorf("failed to parse IPv4 layer")
-	}
-
-	tcpLayer := packet.Layer(layers.LayerTypeTCP)
-	if tcpLayer == nil {
-		return nil, nil, fmt.Errorf("no TCP layer found")
-	}
-
-	tcp, _ := tcpLayer.(*layers.TCP)
-	if tcp == nil {
-		return nil, nil, fmt.Errorf("failed to parse TCP layer")
-	}
-	if len(tcp.Payload) == 0 {
-		return nil, nil, fmt.Errorf("no payload found in TCP layer")
-	}
-
-	return ip, tcp, nil
+type httpRequestAndResponseStreamer struct {
+	bpfExpression             string
+	requestAndResponseChannel *chan httpRequestAndResponse
 }
 
-func HelloServer(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello, %s!", r.URL.Path[1:])
+func (s *httpRequestAndResponseStreamer) start() {
+	handle, err := pcap.OpenLive("any", 1600, true, pcap.BlockForever)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer handle.Close()
+
+	err = handle.SetBPFFilter(s.bpfExpression)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	assembler := tcpassembly.NewAssembler(
+		tcpassembly.NewStreamPool(
+			&bidirectionalStreamFactory{
+				conns:                     make(map[string]*bidirectionalStream),
+				requestAndResponseChannel: s.requestAndResponseChannel,
+			},
+		),
+	)
+	ticker := time.Tick(time.Minute)
+	packetsChannel := gopacket.NewPacketSource(handle, handle.LinkType()).Packets()
+	for {
+		select {
+		case packet := <-packetsChannel:
+			if packet.NetworkLayer() == nil || packet.TransportLayer() == nil {
+				continue
+			}
+			tcp, ok := packet.TransportLayer().(*layers.TCP)
+			if !ok {
+				continue
+			}
+			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), tcp, packet.Metadata().Timestamp)
+		case <-ticker:
+			assembler.FlushOlderThan(time.Now().Add(-2 * time.Minute))
+		default:
+		}
+	}
+}
+
+type bidirectionalStreamFactory struct {
+	conns                     map[string]*bidirectionalStream
+	requestAndResponseChannel *chan httpRequestAndResponse
+}
+
+func (f *bidirectionalStreamFactory) New(netFlow, tcpFlow gopacket.Flow) tcpassembly.Stream {
+	key := netFlow.FastHash() ^ tcpFlow.FastHash()
+
+	// The second time we see the same connection, it will be from the server to the client
+	if conn, ok := f.conns[fmt.Sprint(key)]; ok {
+		return &conn.serverToClient
+	}
+
+	s := &bidirectionalStream{
+		net:                       netFlow,
+		transport:                 tcpFlow,
+		clientToServer:            tcpreader.NewReaderStream(),
+		serverToClient:            tcpreader.NewReaderStream(),
+		requestAndResponseChannel: f.requestAndResponseChannel,
+	}
+	f.conns[fmt.Sprint(key)] = s
+	go s.run()
+
+	// The first time we see the connection, it will be from the client to the server
+	return &s.clientToServer
+}
+
+type bidirectionalStream struct {
+	net, transport            gopacket.Flow
+	clientToServer            tcpreader.ReaderStream
+	serverToClient            tcpreader.ReaderStream
+	requestAndResponseChannel *chan httpRequestAndResponse
+}
+
+func (s *bidirectionalStream) run() {
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	requestChannel := make(chan *http.Request, 1)
+	responseChannel := make(chan *http.Response, 1)
+
+	go func() {
+		reader := bufio.NewReader(&s.clientToServer)
+		for {
+			request, err := http.ReadRequest(reader)
+			if err == io.EOF {
+				wg.Done()
+				return
+			} else if err != nil {
+				continue
+			}
+			responseBody := make([]byte, request.ContentLength)
+			if request.ContentLength > 0 {
+				io.ReadFull(request.Body, responseBody)
+			}
+			request.Body.Close()
+			request.Body = io.NopCloser(bytes.NewReader(responseBody))
+			requestChannel <- request
+
+		}
+	}()
+
+	go func() {
+		reader := bufio.NewReader(&s.serverToClient)
+		for {
+			response, err := http.ReadResponse(reader, nil)
+			if err == io.ErrUnexpectedEOF {
+				wg.Done()
+				return
+			} else if err != nil {
+				continue
+			}
+			responseBody := make([]byte, response.ContentLength)
+			if response.ContentLength > 0 {
+				io.ReadFull(response.Body, responseBody)
+			}
+			response.Body.Close()
+			response.Body = io.NopCloser(bytes.NewReader(responseBody))
+			responseChannel <- response
+		}
+	}()
+
+	wg.Wait()
+
+	capturedRequest := <-requestChannel
+	capturedResponse := <-responseChannel
+	close(requestChannel)
+	close(responseChannel)
+
+	*s.requestAndResponseChannel <- httpRequestAndResponse{
+		request:  capturedRequest,
+		response: capturedResponse,
+	}
 }
 
 func main() {
-	const TARGET_PORT = 80
+	log.Println("🔍 Starting local HTTP server...")
+	go func() {
+		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, "Hello, %s!", r.URL.Path[1:])
+		})
+		log.Fatal(http.ListenAndServe(":80", nil))
+	}()
 
-	// Start a simple HTTP server so we can send some requests to it
-	http.HandleFunc("/", HelloServer)
-	go http.ListenAndServe(":80", nil)
-
-	// Create a raw socket to listen for TCP packets
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_TCP)
-	if err != nil {
-		log.Println("Failed to open raw socket", err.Error())
-		return
+	log.Println("🔍 Starting HTTP request streamer...")
+	requestAndResponseChannel := make(chan httpRequestAndResponse, 1)
+	httpRequestStreamer := &httpRequestAndResponseStreamer{
+		bpfExpression:             "tcp and (port 80 or port 443)",
+		requestAndResponseChannel: &requestAndResponseChannel,
 	}
+	go httpRequestStreamer.start()
 
-	// Apply a BPF filter to the socket
-	err = Filter{
-		bpf.LoadAbsolute{Off: 22, Size: 2},         // load the destination port
-		bpf.JumpIf{Val: TARGET_PORT, SkipFalse: 1}, // if Val != TARGET_PORT skip next instruction
-		bpf.RetConstant{Val: 0xffff},               // return 0xffff bytes (or less) from packet
-		bpf.RetConstant{Val: 0x0},                  // return 0 bytes, effectively ignore this packet
-	}.ApplyTo(fd)
-	if err != nil {
-		log.Println("Failed to apply filter", err.Error())
-		return
-	}
-
-	// Receive packets in a loop
-	log.Printf("🧐 Listening for packets on port %v...\n", TARGET_PORT)
+	log.Println("🔍 Starting HTTP request & response logger...")
 	for {
-		var buf [4096]byte
-		n, _, err := syscall.Recvfrom(fd, buf[:], 0)
-		if err != nil {
-			log.Println("Failed to receive packet", err.Error())
-			continue
+		select {
+		case requestAndResponse := <-requestAndResponseChannel:
+			capturedRequestBody, err := io.ReadAll(requestAndResponse.request.Body)
+			if err != nil {
+				log.Println("Error reading request body:", err.Error())
+				return
+			}
+			capturedResponseBody, err := io.ReadAll(requestAndResponse.response.Body)
+			if err != nil {
+				log.Println("Error reading request body:", err.Error())
+				return
+			}
+			log.Println(
+				"📡 Captured HTTP request & response:",
+				"\n\tRequest:", requestAndResponse.request.Method, requestAndResponse.request.URL,
+				"\n\tResponse:", requestAndResponse.response.Status,
+				"\n\tHost:", requestAndResponse.request.Host,
+				"\n\tRequest Body:", string(capturedRequestBody),
+				"\n\tResponse Body:", string(capturedResponseBody),
+				"\n\tRequest Headers:", requestAndResponse.request.Header,
+				"\n\tResponse Headers:", requestAndResponse.response.Header,
+			)
+		default:
 		}
-
-		ip, tcp, err := parsePacket(buf[:n])
-		if err != nil {
-			log.Println("😭 Failed to parse packet", err.Error())
-			continue
-		}
-
-		log.Printf(
-			"✅ Received packet from %s:%d to %s:%d with payload:\n----------START----------\n%s\n-----------END-----------\n",
-			ip.SrcIP, tcp.SrcPort, ip.DstIP, tcp.DstPort, string(tcp.Payload),
-		)
 	}
 }
