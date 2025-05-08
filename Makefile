@@ -1,10 +1,18 @@
+
+include .env
+
 .PHONY: build
 build:
 	docker build . -t firetail/kubernetes-sensor
 
 .PHONY: publish
-run: build
-	docker run -it -p 8080:80 firetail/kubernetes-sensor
+dev: build
+	docker run -it \
+		-p 8080:80 \
+		-e FIRETAIL_API_URL=https://api.logging.eu-west-1.sandbox.firetail.app/logs/bulk \
+		-e FIRETAIL_API_TOKEN=${FIRETAIL_API_TOKEN} \
+		-e FIRETAIL_KUBERNETES_SENSOR_DEV_MODE=true \
+		firetail/kubernetes-sensor
 
 .PHONY: publish
 publish: build
