@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -172,6 +173,11 @@ func main() {
 		devEnabled = false
 	}
 
+	if devEnabled {
+		slog.Warn("🧰 Development mode enabled, setting log level to debug...")
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
+
 	logsApiToken, logsApiTokenSet := os.LookupEnv("FIRETAIL_API_TOKEN")
 	if !logsApiTokenSet {
 		log.Fatal("FIRETAIL_API_TOKEN environment variable not set")
@@ -179,15 +185,16 @@ func main() {
 
 	bpfExpression, bpfExpressionSet := os.LookupEnv("BPF_EXPRESSION")
 	if !bpfExpressionSet {
-		log.Println(
+		slog.Info(
 			"BPF_EXPRESSION environment variable not set, using default: tcp and (port 80 or port 443). See docs for " +
 				"further info.",
 		)
 		bpfExpression = "tcp and (port 80 or port 443)"
 	}
 
-	if devEnabled {
-		log.Println("🧰 Development mode enabled, starting example HTTP server...")
+	devServerEnabled, err := strconv.ParseBool(os.Getenv("FIRETAIL_KUBERNETES_SENSOR_DEV_SERVER_ENABLED"))
+	if err == nil && devServerEnabled {
+		slog.Warn("🧰 Development server enabled, starting example HTTP server...")
 		go func() {
 			http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "Hello, %s!", r.URL.Path[1:])
@@ -205,7 +212,7 @@ func main() {
 
 	var maxLogAge time.Duration = 0
 	if devEnabled {
-		log.Println("🧰 Development mode enabled, setting max age of logs held by Firetail middleware to 1 second...")
+		slog.Warn("🧰 Development mode enabled, setting max age of logs held by Firetail middleware to 1 second...")
 		maxLogAge = time.Second
 	}
 	firetailMiddleware, err := firetail.GetMiddleware(
@@ -229,6 +236,12 @@ func main() {
 			} else {
 				requestAndResponse.request.RemoteAddr = requestAndResponse.request.Host
 			}
+			slog.Debug(
+				"Captured request and response:",
+				"method", requestAndResponse.request.Method,
+				"url", requestAndResponse.request.URL,
+				"status_code", requestAndResponse.response.StatusCode,
+			)
 			firetailMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(requestAndResponse.response.StatusCode)
 				for key, values := range requestAndResponse.response.Header {
@@ -238,7 +251,7 @@ func main() {
 				}
 				capturedResponseBody, err := io.ReadAll(requestAndResponse.response.Body)
 				if err != nil {
-					log.Println("Error reading request body:", err.Error())
+					slog.Error("Error reading request body:", "err", err.Error())
 					return
 				}
 				w.Write(capturedResponseBody)

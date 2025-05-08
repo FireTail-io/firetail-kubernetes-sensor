@@ -5,6 +5,6 @@ COPY go.mod ./
 COPY go.sum ./
 RUN go mod download
 COPY . .
-RUN GOARCH=arm64 GOOS=linux go build -o /dist/main .
+RUN go build -o /dist/main .
 RUN chmod +x /dist/main
 CMD ["/dist/main"]
