@@ -7,9 +7,13 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httptest"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
+	firetail "github.com/FireTail-io/firetail-go-lib/middlewares/http"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
@@ -163,45 +167,84 @@ func (s *bidirectionalStream) run() {
 }
 
 func main() {
-	log.Println("🔍 Starting local HTTP server...")
-	go func() {
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, "Hello, %s!", r.URL.Path[1:])
-		})
-		log.Fatal(http.ListenAndServe(":80", nil))
-	}()
+	devEnabled, err := strconv.ParseBool(os.Getenv("FIRETAIL_KUBERNETES_SENSOR_DEV_MODE"))
+	if err != nil {
+		devEnabled = false
+	}
 
-	log.Println("🔍 Starting HTTP request streamer...")
+	logsApiToken, logsApiTokenSet := os.LookupEnv("FIRETAIL_API_TOKEN")
+	if !logsApiTokenSet {
+		log.Fatal("FIRETAIL_API_TOKEN environment variable not set")
+	}
+
+	bpfExpression, bpfExpressionSet := os.LookupEnv("BPF_EXPRESSION")
+	if !bpfExpressionSet {
+		log.Println(
+			"BPF_EXPRESSION environment variable not set, using default: tcp and (port 80 or port 443). See docs for " +
+				"further info.",
+		)
+		bpfExpression = "tcp and (port 80 or port 443)"
+	}
+
+	if devEnabled {
+		log.Println("🧰 Development mode enabled, starting example HTTP server...")
+		go func() {
+			http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				fmt.Fprintf(w, "Hello, %s!", r.URL.Path[1:])
+			})
+			log.Fatal(http.ListenAndServe(":80", nil))
+		}()
+	}
+
 	requestAndResponseChannel := make(chan httpRequestAndResponse, 1)
 	httpRequestStreamer := &httpRequestAndResponseStreamer{
-		bpfExpression:             "tcp and (port 80 or port 443)",
+		bpfExpression:             bpfExpression,
 		requestAndResponseChannel: &requestAndResponseChannel,
 	}
 	go httpRequestStreamer.start()
 
-	log.Println("🔍 Starting HTTP request & response logger...")
+	var maxLogAge time.Duration = 0
+	if devEnabled {
+		log.Println("🧰 Development mode enabled, setting max age of logs held by Firetail middleware to 1 second...")
+		maxLogAge = time.Second
+	}
+	firetailMiddleware, err := firetail.GetMiddleware(
+		&firetail.Options{
+			LogsApiToken: logsApiToken,
+			LogsApiUrl:   os.Getenv("FIRETAIL_API_URL"),
+			MaxLogAge:    maxLogAge,
+		},
+	)
+	if err != nil {
+		log.Fatal("Failed to initialise Firetail middleware:", err.Error())
+	}
+
 	for {
 		select {
 		case requestAndResponse := <-requestAndResponseChannel:
-			capturedRequestBody, err := io.ReadAll(requestAndResponse.request.Body)
-			if err != nil {
-				log.Println("Error reading request body:", err.Error())
-				return
+			// We need to set the RemoteAddr to the Host header so it has a value, otherwise the middleware will not
+			// work - it parses the RemoteAddr to get the IP address and expects a port to be present.
+			if requestAndResponse.request.Host[:9] == "localhost" {
+				requestAndResponse.request.RemoteAddr = "127.0.0.1:" + requestAndResponse.request.Host[10:]
+			} else {
+				requestAndResponse.request.RemoteAddr = requestAndResponse.request.Host
 			}
-			capturedResponseBody, err := io.ReadAll(requestAndResponse.response.Body)
-			if err != nil {
-				log.Println("Error reading request body:", err.Error())
-				return
-			}
-			log.Println(
-				"📡 Captured HTTP request & response:",
-				"\n\tRequest:", requestAndResponse.request.Method, requestAndResponse.request.URL,
-				"\n\tResponse:", requestAndResponse.response.Status,
-				"\n\tHost:", requestAndResponse.request.Host,
-				"\n\tRequest Body:", string(capturedRequestBody),
-				"\n\tResponse Body:", string(capturedResponseBody),
-				"\n\tRequest Headers:", requestAndResponse.request.Header,
-				"\n\tResponse Headers:", requestAndResponse.response.Header,
+			firetailMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(requestAndResponse.response.StatusCode)
+				for key, values := range requestAndResponse.response.Header {
+					for _, value := range values {
+						w.Header().Add(key, value)
+					}
+				}
+				capturedResponseBody, err := io.ReadAll(requestAndResponse.response.Body)
+				if err != nil {
+					log.Println("Error reading request body:", err.Error())
+					return
+				}
+				w.Write(capturedResponseBody)
+			})).ServeHTTP(
+				httptest.NewRecorder(),
+				requestAndResponse.request,
 			)
 		default:
 		}
