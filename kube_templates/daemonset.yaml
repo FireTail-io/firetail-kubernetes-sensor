@@ -12,10 +12,11 @@ spec:
       labels:
         name: firetail-ebpf-daemonset
     spec:
+      serviceAccountName: firetail-ebpf-sa
       hostNetwork: true
       containers:
       - name: firetail-ebpf-daemonset
-        image: 799185653336.dkr.ecr.eu-west-1.amazonaws.com/firetail/kubernetes-sensor:v0.0.3
+        image: 799185653336.dkr.ecr.eu-west-1.amazonaws.com/firetail/kubernetes-sensor:v0.0.6
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
@@ -23,9 +24,11 @@ spec:
         - name: FIRETAIL_API_URL
           value: "https://api.logging.eu-west-1.sandbox.firetail.app/logs/bulk"
         - name: FIRETAIL_API_TOKEN
-          value: "{{ .Values.firetailApiKey }}"
+          value: ""
         - name: FIRETAIL_KUBERNETES_SENSOR_DEV_MODE
           value: "true"
+        - name: BPF_EXPRESSION
+          value: "tcp and (port 80 or port 443) and not net 169.254.0.0/16 and not net fd00::/8"
         volumeMounts:
         - name: lib-modules
           mountPath: /lib/modules

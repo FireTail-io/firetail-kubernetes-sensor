@@ -1,0 +1,36 @@
+name: Pull Request
+run-name: "Pull Request: @${{github.triggering_actor}}, ${{github.head_ref}}"
+on:
+  pull_request:
+defaults:
+  run:
+    shell: bash
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  # https://semgrep.dev/docs/semgrep-ci/sample-ci-configs/#sample-github-actions-configuration-file
+  # Ignores patterns in .gitignore and .semgrepignore files
+  sast-semgrep:
+    name: "Static Application Security Testing: Semgrep"
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
+    if: (github.actor != 'dependabot[bot]')
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+      - name: Run Semgrep CI
+        run: semgrep ci
+        env:
+          # https://semgrep.dev/explore
+          SEMGREP_RULES: "p/default"
+  build-docker-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+        with:
+          fetch-depth: 2
+      - name: Run build docker image
+        run: docker build -t lambda-image:latest -f build_setup/Dockerfile .

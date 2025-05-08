@@ -1,8 +1,7 @@
 FROM golang:1.24-bullseye
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends libpcap-dev
-COPY go.mod ./
-COPY go.sum ./
+COPY ./src/ ./
 RUN go mod download
 COPY . .
 RUN go build -o /dist/main .
