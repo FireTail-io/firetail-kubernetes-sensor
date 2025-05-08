@@ -53,3 +53,6 @@ Authenticate and then use the `publish` target in [the provided makefile](./Make
 ftauth
 make publish VERSION=latest
 ```
+
+[Kubernetes sensor docker repository link](https://github.com/firetail-io/firetail-kubernetes-sensor/pkgs/container/kubernetes-sensor)
+
