@@ -16,7 +16,7 @@ spec:
       hostNetwork: true
       containers:
       - name: firetail-ebpf-daemonset
-        image: ghcr.io/firetail-io/kubernetes-sensor:488c903
+        image: ghcr.io/firetail-io/kubernetes-sensor:v0.1.5
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
