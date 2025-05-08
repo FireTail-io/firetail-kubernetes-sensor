@@ -4,14 +4,28 @@ POC for a FireTail Kubernetes Sensor.
 
 
 
-## Quickstart
+## Environment Variables
 
-Clone the repo, then use the `run` target in [the provided makefile](./Makefile):
+| Variable Name                         | Required? | Example                                                      | Description                                                  |
+| ------------------------------------- | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| `FIRETAIL_API_TOKEN`                  | ✅         | `PS-02-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX` | The API token the sensor will use to report logs to FireTail |
+| `BPF_EXPRESSION`                      | ❌         | `tcp and (port 80 or port 443)`                              | The BPF filter used by the sensor. See docs for syntax info: https://www.tcpdump.org/manpages/pcap-filter.7.html |
+| `FIRETAIL_API_URL`                    | ❌         | `https://api.logging.eu-west-1.prod.firetail.app/logs/bulk`  | The API url the sensor will send logs to. Defaults to the EU region production environment. |
+| `FIRETAIL_KUBERNETES_SENSOR_DEV_MODE` | ❌         | `true`                                                       | When set to `true`,                                          |
+
+
+
+
+
+## Dev Quickstart
+
+Clone the repo, make a `.env` file with your API token in it, then use the `dev` target in [the provided makefile](./Makefile):
 
 ```bash
 git clone git@github.com:FireTail-io/firetail-kubernetes-sensor.git
 cd firetail-kubernetes-sensor
-make run
+echo FIRETAIL_API_TOKEN=YOUR_API_TOKEN > .env
+make dev
 ```
 
 In another terminal:
@@ -26,21 +40,7 @@ You should receive the following response:
 Hello, world!
 ```
 
-And the docker container should have logs similar to the following:
-
-```text
-2025/05/07 16:23:11 🔍 Starting local HTTP server...
-2025/05/07 16:23:11 🔍 Starting HTTP request streamer...
-2025/05/07 16:23:11 🔍 Starting HTTP request & response logger...
-2025/05/07 16:23:14 📡 Captured HTTP request & response: 
-        Request: GET /world 
-        Response: 200 OK 
-        Host: localhost:8080 
-        Request Body:  
-        Response Body: Hello, world! 
-        Request Headers: map[Accept:[*/*] User-Agent:[curl/8.7.1]] 
-        Response Headers: map[Content-Length:[13] Content-Type:[text/plain; charset=utf-8] Date:[Wed, 07 May 2025 16:23:14 GMT]]
-```
+After a few seconds, you should see logs appear in the FireTail SaaS platform.
 
 
 
