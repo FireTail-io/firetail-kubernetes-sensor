@@ -1,0 +1,41 @@
+# Default values for firetail-sensor.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: ghcr.io/firetail-io/kubernetes-sensor
+  tag: v0.1.5
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+namespace: "firetail"
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+  namespace: default
+
+securityContext: 
+  privileged: true
+
+
+
+
+env:
+  FIRETAIL_API_URL: "https://api.logging.eu-west-1.sandbox.firetail.app/logs/bulk"
+  FIRETAIL_API_URL_EU: "https://api.logging.eu-west-1.firetail.app/logs/bulk"
+  FIRETAIL_API_URL_US: "https://api.logging.us-east-2.us.firetail.app/logs/bulk"
+  FIRETAIL_KUBERNETES_SENSOR_DEV_MODE: "false"
+  FIRETAIL_KUBERNETES_SENSOR_DEV_SERVER_ENABLED: "false"
+  BPF_EXPRESSION: "tcp and (port 80 or port 443) and not net 169.254.0.0/16 and not net fd00::/8"
+
+
+apiKey: ""

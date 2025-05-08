@@ -24,7 +24,7 @@ spec:
         - name: FIRETAIL_API_URL
           value: "https://api.logging.eu-west-1.sandbox.firetail.app/logs/bulk"
         - name: FIRETAIL_API_TOKEN
-          value: ""
+          value: 
         - name: FIRETAIL_KUBERNETES_SENSOR_DEV_MODE
           value: "true"
         - name: BPF_EXPRESSION
