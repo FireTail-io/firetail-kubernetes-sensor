@@ -1,0 +1,29 @@
+name: Deploy 
+
+on:
+  release:
+    types:
+      - released
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+  packages: write
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      mymatrix: ${{ steps.matrixStep.outputs.matrixItems }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+        with:
+          fetch-depth: 2
+      - uses: actions/download-artifact@v4
+        with:
+          name: draft-release.tar 
+      - run: |
+          docker image load --input draft-release.tar
+          docker tag lambda-image:latest ghcr.io/firetail-io/kubernetes-sensor:${{ github.event.release.tag_name }}
+          docker push ghcr.io/firetail-io/kubernetes-sensor:${{ github.event.release.tag_name }}
