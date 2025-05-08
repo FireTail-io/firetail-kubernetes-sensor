@@ -1,0 +1,25 @@
+include .env
+
+.PHONY: build
+build:
+	docker build . --platform linux/amd64 -t firetail/kubernetes-sensor
+
+.PHONY: publish
+publish: build
+	aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 799185653336.dkr.ecr.eu-west-1.amazonaws.com
+	docker tag firetail/kubernetes-sensor:latest 799185653336.dkr.ecr.eu-west-1.amazonaws.com/firetail/kubernetes-sensor:v0.0.3
+	docker push 799185653336.dkr.ecr.eu-west-1.amazonaws.com/firetail/kubernetes-sensor:v0.0.3
+
+.PHONY: build-dev
+build-dev:
+	docker build . -t firetail/kubernetes-sensor-dev
+
+.PHONY: publish
+dev: build-dev
+	docker run -it \
+		-p 8080:80 \
+		-e FIRETAIL_API_URL=https://api.logging.eu-west-1.sandbox.firetail.app/logs/bulk \
+		-e FIRETAIL_API_TOKEN=${FIRETAIL_API_TOKEN} \
+		-e FIRETAIL_KUBERNETES_SENSOR_DEV_MODE=true \
+		-e FIRETAIL_KUBERNETES_SENSOR_DEV_SERVER_ENABLED=true \
+		firetail/kubernetes-sensor-dev
