@@ -6,12 +6,13 @@ POC for a FireTail Kubernetes Sensor.
 
 ## Environment Variables
 
-| Variable Name                         | Required? | Example                                                      | Description                                                  |
-| ------------------------------------- | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| `FIRETAIL_API_TOKEN`                  | ✅         | `PS-02-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX` | The API token the sensor will use to report logs to FireTail |
-| `BPF_EXPRESSION`                      | ❌         | `tcp and (port 80 or port 443)`                              | The BPF filter used by the sensor. See docs for syntax info: https://www.tcpdump.org/manpages/pcap-filter.7.html |
-| `FIRETAIL_API_URL`                    | ❌         | `https://api.logging.eu-west-1.prod.firetail.app/logs/bulk`  | The API url the sensor will send logs to. Defaults to the EU region production environment. |
-| `FIRETAIL_KUBERNETES_SENSOR_DEV_MODE` | ❌         | `true`                                                       | When set to `true`,                                          |
+| Variable Name                                   | Required? | Example                                                      | Description                                                  |
+| ----------------------------------------------- | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| `FIRETAIL_API_TOKEN`                            | ✅         | `PS-02-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX` | The API token the sensor will use to report logs to FireTail |
+| `BPF_EXPRESSION`                                | ❌         | `tcp and (port 80 or port 443)`                              | The BPF filter used by the sensor. See docs for syntax info: https://www.tcpdump.org/manpages/pcap-filter.7.html |
+| `FIRETAIL_API_URL`                              | ❌         | `https://api.logging.eu-west-1.prod.firetail.app/logs/bulk`  | The API url the sensor will send logs to. Defaults to the EU region production environment. |
+| `FIRETAIL_KUBERNETES_SENSOR_DEV_MODE`           | ❌         | `true`                                                       | Enables debug logging when set to `true`.                    |
+| `FIRETAIL_KUBERNETES_SENSOR_DEV_SERVER_ENABLED` | ❌         | `true`                                                       | Enables a demo web server when set to `true`; useful for sending test requests to. |
 
 
 
