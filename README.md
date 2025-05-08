@@ -51,5 +51,5 @@ Authenticate and then use the `publish` target in [the provided makefile](./Make
 
 ```bash
 ftauth
-make publish
+make publish VERSION=latest
 ```
