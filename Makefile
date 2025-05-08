@@ -7,8 +7,8 @@ build:
 .PHONY: publish
 publish: build
 	aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin 799185653336.dkr.ecr.eu-west-1.amazonaws.com
-	docker tag firetail/kubernetes-sensor:latest 799185653336.dkr.ecr.eu-west-1.amazonaws.com/firetail/kubernetes-sensor:v0.0.3
-	docker push 799185653336.dkr.ecr.eu-west-1.amazonaws.com/firetail/kubernetes-sensor:v0.0.3
+	docker tag firetail/kubernetes-sensor:latest 799185653336.dkr.ecr.eu-west-1.amazonaws.com/firetail/kubernetes-sensor:${VERSION}
+	docker push 799185653336.dkr.ecr.eu-west-1.amazonaws.com/firetail/kubernetes-sensor:${VERSION}
 
 .PHONY: build-dev
 build-dev:
