@@ -21,12 +21,5 @@ jobs:
         with:
           fetch-depth: 2
       - run: |
-          gh release download "${{ github.event.release.tag_name }}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --clobber
-        env:
-          GH_TOKEN: ${{ github.token }}
-      - run: |
-          docker image load --input draft-release.tar
-          docker tag docker-image:latest ghcr.io/firetail-io/kubernetes-sensor:${{ github.event.release.tag_name }}
+          docker build -t ghcr.io/firetail-io/kubernetes-sensor:${{ github.event.release.tag_name }} -f build_setup/Dockerfile .
           docker push ghcr.io/firetail-io/kubernetes-sensor:${{ github.event.release.tag_name }}

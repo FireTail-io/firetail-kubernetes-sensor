@@ -18,29 +18,8 @@ jobs:
         uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
         with:
           fetch-depth: 2
-      - name: Run build docker image
-        run: |-
-          docker build -t docker-image:latest -f build_setup/Dockerfile .
-          docker save --output draft-release.tar docker-image:latest
-      - name: Use Tag
-        env:
-          # pull-requests don't use github.sha for some reason
-          COMMIT_SHA: ${{github.event.pull_request.head.sha || github.sha}}
-        run: |-
-          shopt -s nocasematch
-          [[ ${GITHUB_REF_TYPE} == "tag" ]] &&
-            VERSION=${GITHUB_REF_NAME} ||
-            VERSION=$(git rev-parse --short "${COMMIT_SHA}")
-          cat <<HEREDOC >>"${GITHUB_ENV}"
-          VERSION=${VERSION}
-          HEREDOC
       - name: Draft Release
         id: draft_release
         uses: release-drafter/release-drafter@65c5fb495d1e69aa8c08a3317bc44ff8aabe9772 # v5.24.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload Artifact and Checksum to Release
-        env:
-          GITHUB_TOKEN: ${{github.token}}
-        run: |
-          gh release upload ${{steps.draft_release.outputs.tag_name}} draft-release.tar --clobber
