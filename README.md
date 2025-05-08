@@ -26,7 +26,6 @@ Clone the repo, make a `.env` file with your API token in it, then use the `dev`
 git clone git@github.com:FireTail-io/firetail-kubernetes-sensor.git
 cd firetail-kubernetes-sensor
 echo FIRETAIL_API_TOKEN=YOUR_API_TOKEN > .env
-cd build_setup
 make dev
 ```
 
@@ -52,6 +51,5 @@ Authenticate and then use the `publish` target in [the provided makefile](./Make
 
 ```bash
 ftauth
-cd build_setup
 make publish VERSION=latest
 ```
