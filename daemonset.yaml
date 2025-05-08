@@ -12,12 +12,20 @@ spec:
       labels:
         name: firetail-ebpf-daemonset
     spec:
+      hostNetwork: true
       containers:
       - name: firetail-ebpf-daemonset
-        image: 799185653336.dkr.ecr.eu-west-1.amazonaws.com/firetail/kubernetes-sensor:latest
+        image: 799185653336.dkr.ecr.eu-west-1.amazonaws.com/firetail/kubernetes-sensor:v0.0.3
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
+        env:
+        - name: FIRETAIL_API_URL
+          value: "https://api.logging.eu-west-1.sandbox.firetail.app/logs/bulk"
+        - name: FIRETAIL_API_TOKEN
+          value: "{{ .Values.firetailApiKey }}"
+        - name: FIRETAIL_KUBERNETES_SENSOR_DEV_MODE
+          value: "true"
         volumeMounts:
         - name: lib-modules
           mountPath: /lib/modules
