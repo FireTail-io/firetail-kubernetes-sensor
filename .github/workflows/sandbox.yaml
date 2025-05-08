@@ -31,7 +31,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Docker image
         run: |
-          docker build -f build_setup/Dockerfile -t ghcr.io/${{ github.repository_owner }}/kubernetes-sensor:latest .
+          docker build -f build_setup/Dockerfile -t ghcr.io/${{ github.repository_owner | toLower }}/kubernetes-sensor:latest .
       - name: Push Docker image to GHCR
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/kubernetes-sensor:latest
+          docker push ghcr.io/${{ github.repository_owner | toLower }}/kubernetes-sensor:latest
