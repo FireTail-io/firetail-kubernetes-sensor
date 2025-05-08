@@ -20,8 +20,8 @@ jobs:
           fetch-depth: 2
       - name: Run build docker image
         run: |-
-          docker build -t lambda-image:latest -f build_setup/Dockerfile .
-          docker save --output draft-release.tar lambda-image:latest
+          docker build -t docker-image:latest -f build_setup/Dockerfile .
+          docker save --output draft-release.tar docker-image:latest
       - name: Use Tag
         env:
           # pull-requests don't use github.sha for some reason
