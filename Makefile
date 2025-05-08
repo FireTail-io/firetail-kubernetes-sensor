@@ -2,7 +2,7 @@ include .env
 
 .PHONY: build
 build:
-	docker build . --platform linux/amd64 -t firetail/kubernetes-sensor
+	docker build -f build_setup/Dockerfile . --platform linux/amd64 -t firetail/kubernetes-sensor
 
 .PHONY: publish
 publish: build
@@ -12,7 +12,7 @@ publish: build
 
 .PHONY: build-dev
 build-dev:
-	docker build . -t firetail/kubernetes-sensor-dev
+	docker build -f build_setup/Dockerfile . -t firetail/kubernetes-sensor-dev
 
 .PHONY: publish
 dev: build-dev

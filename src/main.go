@@ -25,6 +25,10 @@ import (
 type httpRequestAndResponse struct {
 	request  *http.Request
 	response *http.Response
+	src      string
+	dst      string
+	srcPort  string
+	dstPort  string
 }
 
 type httpRequestAndResponseStreamer struct {
@@ -166,6 +170,10 @@ func (s *bidirectionalStream) run() {
 	*s.requestAndResponseChannel <- httpRequestAndResponse{
 		request:  capturedRequest,
 		response: capturedResponse,
+		src:      s.net.Src().String(),
+		dst:      s.net.Dst().String(),
+		srcPort:  s.transport.Src().String(),
+		dstPort:  s.transport.Dst().String(),
 	}
 }
 
@@ -236,7 +244,10 @@ func main() {
 				"Method", requestAndResponse.request.Method,
 				"URL", requestAndResponse.request.URL,
 				"StatusCode", requestAndResponse.response.StatusCode,
-				"RemoteAddr", requestAndResponse.request.RemoteAddr,
+				"Src", requestAndResponse.src,
+				"Dst", requestAndResponse.dst,
+				"SrcPort", requestAndResponse.srcPort,
+				"DstPort", requestAndResponse.dstPort,
 			)
 			firetailMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(requestAndResponse.response.StatusCode)
