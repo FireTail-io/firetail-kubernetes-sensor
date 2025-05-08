@@ -123,6 +123,8 @@ func (s *bidirectionalStream) run() {
 			} else if err != nil {
 				continue
 			}
+			// RemoteAddr is not filled in by ReadRequest so we have to populate it ourselves
+			request.RemoteAddr = fmt.Sprintf("%s:%s", s.net.Src().String(), s.transport.Src().String())
 			responseBody := make([]byte, request.ContentLength)
 			if request.ContentLength > 0 {
 				io.ReadFull(request.Body, responseBody)
@@ -229,18 +231,12 @@ func main() {
 	for {
 		select {
 		case requestAndResponse := <-requestAndResponseChannel:
-			// We need to set the RemoteAddr to the Host header so it has a value, otherwise the middleware will not
-			// work - it parses the RemoteAddr to get the IP address and expects a port to be present.
-			if requestAndResponse.request.Host[:9] == "localhost" {
-				requestAndResponse.request.RemoteAddr = "127.0.0.1:" + requestAndResponse.request.Host[10:]
-			} else {
-				requestAndResponse.request.RemoteAddr = requestAndResponse.request.Host
-			}
 			slog.Debug(
 				"Captured request and response:",
-				"method", requestAndResponse.request.Method,
-				"url", requestAndResponse.request.URL,
-				"status_code", requestAndResponse.response.StatusCode,
+				"Method", requestAndResponse.request.Method,
+				"URL", requestAndResponse.request.URL,
+				"StatusCode", requestAndResponse.response.StatusCode,
+				"RemoteAddr", requestAndResponse.request.RemoteAddr,
 			)
 			firetailMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(requestAndResponse.response.StatusCode)
