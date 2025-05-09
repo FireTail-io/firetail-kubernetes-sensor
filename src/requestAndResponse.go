@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -56,6 +57,22 @@ func (s *httpRequestAndResponseStreamer) start() {
 			}
 			tcp, ok := packet.TransportLayer().(*layers.TCP)
 			if !ok {
+				continue
+			}
+			net, ok := packet.NetworkLayer().(*layers.IPv4)
+			if !ok {
+				continue
+			}
+			src := net.SrcIP.String()
+			dst := net.DstIP.String()
+			if s.ipManager != nil && !(s.ipManager.isServiceIP(dst) || s.ipManager.isServiceIP(src)) {
+				slog.Debug(
+					"Ignoring packet not destined for or originating from a service IP:",
+					"Src", src,
+					"Dst", dst,
+					"SrcPort", tcp.SrcPort.String(),
+					"DstPort", tcp.DstPort.String(),
+				)
 				continue
 			}
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), tcp, packet.Metadata().Timestamp)
