@@ -26,15 +26,15 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         env:
-        {{- range $key, $value := .Values.env }}
-        - name: "{{ $key }}"
-          value: "{{ $value }}"
-        {{- end }}
         - name: "FIRETAIL_API_TOKEN"
           valueFrom:
             secretKeyRef:
               name: "firetail-api-token-secret"
               key: "api-key"
+        {{- range $key, $value := .Values.env }}
+        - name: "{{ $key }}"
+          value: "{{ $value }}"
+        {{- end }}
         resources:
           {{- toYaml .Values.resources | nindent 12 }}
         securityContext:
