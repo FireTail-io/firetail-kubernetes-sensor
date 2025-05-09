@@ -251,7 +251,7 @@ func main() {
 		case requestAndResponse := <-requestAndResponseChannel:
 			if !(ipManager == nil || ipManager.isServiceIP(requestAndResponse.dst)) {
 				slog.Debug(
-					"Skipping connection to non-service IP:",
+					"Ignoring request to non-service IP:",
 					"Src", requestAndResponse.src,
 					"Dst", requestAndResponse.dst,
 					"SrcPort", requestAndResponse.srcPort,
