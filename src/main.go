@@ -34,6 +34,7 @@ type httpRequestAndResponse struct {
 type httpRequestAndResponseStreamer struct {
 	bpfExpression             string
 	requestAndResponseChannel *chan httpRequestAndResponse
+	ipManager                 *serviceIpManager
 }
 
 func (s *httpRequestAndResponseStreamer) start() {
@@ -53,6 +54,7 @@ func (s *httpRequestAndResponseStreamer) start() {
 			&bidirectionalStreamFactory{
 				conns:                     make(map[string]*bidirectionalStream),
 				requestAndResponseChannel: s.requestAndResponseChannel,
+				ipManager:                 s.ipManager,
 			},
 		),
 	)
@@ -68,6 +70,20 @@ func (s *httpRequestAndResponseStreamer) start() {
 			if !ok {
 				continue
 			}
+			net, ok := packet.NetworkLayer().(*layers.IPv4)
+			if !ok {
+				continue
+			}
+			if s.ipManager != nil && s.ipManager.isServiceIP(net.DstIP.String()) {
+				slog.Debug(
+					"Skipping connection to non-service IP:",
+					"Src", net.SrcIP.String(),
+					"Dst", net.DstIP.String(),
+					"SrcPort", tcp.SrcPort.String(),
+					"DstPort", tcp.DstPort.String(),
+				)
+				continue
+			}
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), tcp, packet.Metadata().Timestamp)
 		case <-ticker:
 			assembler.FlushOlderThan(time.Now().Add(-2 * time.Minute))
@@ -79,6 +95,7 @@ func (s *httpRequestAndResponseStreamer) start() {
 type bidirectionalStreamFactory struct {
 	conns                     map[string]*bidirectionalStream
 	requestAndResponseChannel *chan httpRequestAndResponse
+	ipManager                 *serviceIpManager
 }
 
 func (f *bidirectionalStreamFactory) New(netFlow, tcpFlow gopacket.Flow) tcpassembly.Stream {
@@ -193,6 +210,14 @@ func main() {
 		log.Fatal("FIRETAIL_API_TOKEN environment variable not set")
 	}
 
+	var ipManager *serviceIpManager
+	if disableServiceIpFilter, err := strconv.ParseBool(os.Getenv("DISABLE_SERVICE_IP_FILTERING")); err != nil || !disableServiceIpFilter {
+		slog.Info(
+			"Service IP filter enabled, monitoring service IPs...",
+		)
+		ipManager = newServiceIpManager()
+	}
+
 	bpfExpression, bpfExpressionSet := os.LookupEnv("BPF_EXPRESSION")
 	if !bpfExpressionSet {
 		slog.Info(
@@ -217,6 +242,7 @@ func main() {
 	httpRequestStreamer := &httpRequestAndResponseStreamer{
 		bpfExpression:             bpfExpression,
 		requestAndResponseChannel: &requestAndResponseChannel,
+		ipManager:                 ipManager,
 	}
 	go httpRequestStreamer.start()
 
