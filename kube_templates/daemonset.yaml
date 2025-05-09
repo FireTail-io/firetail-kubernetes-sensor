@@ -19,7 +19,7 @@ spec:
         image: ghcr.io/firetail-io/kubernetes-sensor:v0.1.5
         imagePullPolicy: IfNotPresent
         securityContext:
-          privileged: true # nosemgrep
+          privileged: true # nosemgrep: yaml.kubernetes.security.privileged-container.privileged-container
         env:
         - name: FIRETAIL_API_URL
           value: "https://api.logging.eu-west-1.sandbox.firetail.app/logs/bulk"
