@@ -74,7 +74,7 @@ func (s *httpRequestAndResponseStreamer) start() {
 			if !ok {
 				continue
 			}
-			if s.ipManager != nil && s.ipManager.isServiceIP(net.DstIP.String()) {
+			if !(s.ipManager == nil || s.ipManager.isServiceIP(net.DstIP.String())) {
 				slog.Debug(
 					"Skipping connection to non-service IP:",
 					"Src", net.SrcIP.String(),
