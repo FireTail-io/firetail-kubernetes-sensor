@@ -15,7 +15,7 @@ spec:
       serviceAccountName: firetail-ebpf-sa
       hostNetwork: true
       containers:
-      - name: firetail-ebpf-daemonset
+      - name: firetail-ebpf-daemonset # nosemgrep: yaml.kubernetes.security.privileged-container.privileged-container
         image: ghcr.io/firetail-io/kubernetes-sensor:v0.1.5
         imagePullPolicy: IfNotPresent
         securityContext:
