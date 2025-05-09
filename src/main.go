@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"strconv"
-	"sync"
 	"time"
 
 	firetail "github.com/FireTail-io/firetail-go-lib/middlewares/http"
@@ -54,7 +53,6 @@ func (s *httpRequestAndResponseStreamer) start() {
 			&bidirectionalStreamFactory{
 				conns:                     make(map[string]*bidirectionalStream),
 				requestAndResponseChannel: s.requestAndResponseChannel,
-				ipManager:                 s.ipManager,
 			},
 		),
 	)
@@ -70,20 +68,6 @@ func (s *httpRequestAndResponseStreamer) start() {
 			if !ok {
 				continue
 			}
-			net, ok := packet.NetworkLayer().(*layers.IPv4)
-			if !ok {
-				continue
-			}
-			if !(s.ipManager == nil || s.ipManager.isServiceIP(net.DstIP.String())) {
-				slog.Debug(
-					"Skipping connection to non-service IP:",
-					"Src", net.SrcIP.String(),
-					"Dst", net.DstIP.String(),
-					"SrcPort", tcp.SrcPort.String(),
-					"DstPort", tcp.DstPort.String(),
-				)
-				continue
-			}
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), tcp, packet.Metadata().Timestamp)
 		case <-ticker:
 			assembler.FlushOlderThan(time.Now().Add(-2 * time.Minute))
@@ -95,7 +79,6 @@ func (s *httpRequestAndResponseStreamer) start() {
 type bidirectionalStreamFactory struct {
 	conns                     map[string]*bidirectionalStream
 	requestAndResponseChannel *chan httpRequestAndResponse
-	ipManager                 *serviceIpManager
 }
 
 func (f *bidirectionalStreamFactory) New(netFlow, tcpFlow gopacket.Flow) tcpassembly.Stream {
@@ -211,7 +194,7 @@ func main() {
 	}
 
 	var ipManager *serviceIpManager
-	if disableServiceIpFilter, err := strconv.ParseBool(os.Getenv("DISABLE_SERVICE_IP_FILTERING")); err != nil || !disableServiceIpFilter {
+	if disableServiceIpFilter, err := strconv.ParseBool(os.Getenv("DISABLE_SERVICE_IP_FILTERING")); !(err == nil && disableServiceIpFilter) {
 		slog.Info(
 			"Service IP filter enabled, monitoring service IPs...",
 		)
@@ -265,6 +248,16 @@ func main() {
 	for {
 		select {
 		case requestAndResponse := <-requestAndResponseChannel:
+			if !(ipManager == nil || ipManager.isServiceIP(requestAndResponse.dst)) {
+				slog.Debug(
+					"Skipping connection to non-service IP:",
+					"Src", requestAndResponse.src,
+					"Dst", requestAndResponse.dst,
+					"SrcPort", requestAndResponse.srcPort,
+					"DstPort", requestAndResponse.dstPort,
+				)
+				continue
+			}
 			slog.Debug(
 				"Captured request and response:",
 				"Method", requestAndResponse.request.Method,
