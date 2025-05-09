@@ -37,7 +37,11 @@ func (s *serviceIpManager) run() {
 				slog.Error("Failed to get service IPs:", "Err", err.Error())
 				continue
 			}
-			slog.Debug("Discovered service IPs", "ServiceIpCount", len(currentServiceIPs))
+			slog.Debug(
+				"Discovered service IPs",
+				"ServiceIpCount", len(currentServiceIPs),
+				"ServiceIPs", currentServiceIPs,
+			)
 			for _, ip := range currentServiceIPs {
 				s.serviceIPs.Store(ip, struct{}{})
 			}
