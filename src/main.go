@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	firetail "github.com/FireTail-io/firetail-go-lib/middlewares/http"
