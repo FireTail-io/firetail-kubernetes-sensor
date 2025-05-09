@@ -15,32 +15,15 @@ import (
 )
 
 func main() {
-	devEnabled, _ := strconv.ParseBool(os.Getenv("FIRETAIL_KUBERNETES_SENSOR_DEV_MODE"))
-	if devEnabled {
-		slog.Warn("🧰 Development mode enabled, setting log level to debug...")
-		slog.SetLogLoggerLevel(slog.LevelDebug)
-	}
-
 	logsApiToken, logsApiTokenSet := os.LookupEnv("FIRETAIL_API_TOKEN")
 	if !logsApiTokenSet {
 		log.Fatal("FIRETAIL_API_TOKEN environment variable not set")
 	}
 
-	var ipManager *serviceIpManager
-	if disableServiceIpFilter, err := strconv.ParseBool(os.Getenv("DISABLE_SERVICE_IP_FILTERING")); !(err == nil && disableServiceIpFilter) {
-		slog.Info(
-			"Service IP filter enabled, monitoring service IPs...",
-		)
-		ipManager = newServiceIpManager()
-	}
-
-	bpfExpression, bpfExpressionSet := os.LookupEnv("BPF_EXPRESSION")
-	if !bpfExpressionSet {
-		slog.Info(
-			"BPF_EXPRESSION environment variable not set, using default: tcp and (port 80 or port 443). See docs for " +
-				"further info.",
-		)
-		bpfExpression = "tcp and (port 80 or port 443)"
+	devEnabled, _ := strconv.ParseBool(os.Getenv("FIRETAIL_KUBERNETES_SENSOR_DEV_MODE"))
+	if devEnabled {
+		slog.Warn("🧰 Development mode enabled, setting log level to debug...")
+		slog.SetLogLoggerLevel(slog.LevelDebug)
 	}
 
 	devServerEnabled, err := strconv.ParseBool(os.Getenv("FIRETAIL_KUBERNETES_SENSOR_DEV_SERVER_ENABLED"))
@@ -53,6 +36,25 @@ func main() {
 			log.Fatal(http.ListenAndServe(":80", nil))
 		}()
 	}
+
+	bpfExpression, bpfExpressionSet := os.LookupEnv("BPF_EXPRESSION")
+	if !bpfExpressionSet {
+		slog.Info(
+			"BPF_EXPRESSION environment variable not set, using default: tcp and (port 80 or port 443). See docs for " +
+				"further info.",
+		)
+		bpfExpression = "tcp and (port 80 or port 443)"
+	}
+
+	var ipManager *serviceIpManager
+	if disableServiceIpFilter, err := strconv.ParseBool(os.Getenv("DISABLE_SERVICE_IP_FILTERING")); !(err == nil && disableServiceIpFilter) {
+		slog.Info(
+			"Service IP filter enabled, monitoring service IPs...",
+		)
+		ipManager = newServiceIpManager()
+	}
+
+	onlyLogJson, _ := strconv.ParseBool(os.Getenv("ENABLE_ONLY_LOG_JSON"))
 
 	requestAndResponseChannel := make(chan httpRequestAndResponse, 1)
 	httpRequestStreamer := &httpRequestAndResponseStreamer{
@@ -84,6 +86,16 @@ func main() {
 			if !(ipManager == nil || ipManager.isServiceIP(requestAndResponse.dst)) {
 				slog.Debug(
 					"Ignoring request to non-service IP:",
+					"Src", requestAndResponse.src,
+					"Dst", requestAndResponse.dst,
+					"SrcPort", requestAndResponse.srcPort,
+					"DstPort", requestAndResponse.dstPort,
+				)
+				continue
+			}
+			if onlyLogJson && !isJson(requestAndResponse.request) {
+				slog.Debug(
+					"Ignoring non-JSON request:",
 					"Src", requestAndResponse.src,
 					"Dst", requestAndResponse.dst,
 					"SrcPort", requestAndResponse.srcPort,
