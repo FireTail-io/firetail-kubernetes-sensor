@@ -27,7 +27,7 @@ func isJson(reqAndResp *httpRequestAndResponse, maxContentLength int64) bool {
 		if err != nil {
 			return false
 		}
-		var v map[string]interface{}
+		var v interface{}
 		if json.Unmarshal(bodyBytes, &v) == nil {
 			return true
 		}
@@ -39,7 +39,7 @@ func isJson(reqAndResp *httpRequestAndResponse, maxContentLength int64) bool {
 		if err != nil {
 			return false
 		}
-		var v map[string]interface{}
+		var v interface{}
 		if json.Unmarshal(bodyBytes, &v) == nil {
 			return true
 		}
