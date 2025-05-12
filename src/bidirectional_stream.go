@@ -15,7 +15,7 @@ import (
 )
 
 type bidirectionalStreamFactory struct {
-	conns                     map[string]*bidirectionalStream
+	conns                     *sync.Map
 	requestAndResponseChannel *chan httpRequestAndResponse
 	maxBodySize               int64
 }
@@ -24,8 +24,8 @@ func (f *bidirectionalStreamFactory) New(netFlow, tcpFlow gopacket.Flow) tcpasse
 	key := netFlow.FastHash() ^ tcpFlow.FastHash()
 
 	// The second time we see the same connection, it will be from the server to the client
-	if conn, ok := f.conns[fmt.Sprint(key)]; ok {
-		return &conn.serverToClient
+	if conn, ok := f.conns.Load(fmt.Sprint(key)); ok {
+		return &conn.(*bidirectionalStream).serverToClient
 	}
 
 	s := &bidirectionalStream{
@@ -34,9 +34,12 @@ func (f *bidirectionalStreamFactory) New(netFlow, tcpFlow gopacket.Flow) tcpasse
 		clientToServer:            tcpreader.NewReaderStream(),
 		serverToClient:            tcpreader.NewReaderStream(),
 		requestAndResponseChannel: f.requestAndResponseChannel,
+		closeCallback: func() {
+			f.conns.Delete(fmt.Sprint(key))
+		},
 		maxBodySize: f.maxBodySize,
 	}
-	f.conns[fmt.Sprint(key)] = s
+	f.conns.Store(fmt.Sprint(key), s)
 	go s.run()
 
 	// The first time we see the connection, it will be from the client to the server
@@ -48,10 +51,13 @@ type bidirectionalStream struct {
 	clientToServer            tcpreader.ReaderStream
 	serverToClient            tcpreader.ReaderStream
 	requestAndResponseChannel *chan httpRequestAndResponse
+	closeCallback             func()
 	maxBodySize               int64
 }
 
 func (s *bidirectionalStream) run() {
+	defer s.closeCallback()
+
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 
