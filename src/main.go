@@ -54,7 +54,21 @@ func main() {
 		ipManager = newServiceIpManager()
 	}
 
+	var maxContentLength int64
 	onlyLogJson, _ := strconv.ParseBool(os.Getenv("ENABLE_ONLY_LOG_JSON"))
+	if onlyLogJson {
+		maxContentLengthStr, maxContentLengthSet := os.LookupEnv("ONLY_LOG_JSON_MAX_CONTENT_LENGTH")
+		if !maxContentLengthSet {
+			slog.Info("ONLY_LOG_JSON_MAX_CONTENT_LENGTH environment variable not set, using default: 1MiB")
+			maxContentLength = 1048576 // 1MiB
+		} else {
+			maxContentLength, err = strconv.ParseInt(maxContentLengthStr, 10, 64)
+			if err != nil {
+				slog.Error("Failed to parse ONLY_LOG_JSON_MAX_CONTENT_LENGTH, Defaulting to 1MiB.", "Err", err.Error())
+				maxContentLength = 1048576 // 1MiB
+			}
+		}
+	}
 
 	requestAndResponseChannel := make(chan httpRequestAndResponse, 1)
 	httpRequestStreamer := &httpRequestAndResponseStreamer{
@@ -93,7 +107,7 @@ func main() {
 				)
 				continue
 			}
-			if onlyLogJson && !isJson(&requestAndResponse) {
+			if onlyLogJson && !isJson(&requestAndResponse, maxContentLength) {
 				slog.Debug(
 					"Ignoring non-JSON request:",
 					"Src", requestAndResponse.src,

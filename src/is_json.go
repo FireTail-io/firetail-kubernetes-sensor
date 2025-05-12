@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-func isJson(req_and_resp *httpRequestAndResponse) bool {
-	for _, headers := range []http.Header{req_and_resp.request.Header, req_and_resp.response.Header} {
+func isJson(reqAndResp *httpRequestAndResponse, maxContentLength int64) bool {
+	for _, headers := range []http.Header{reqAndResp.request.Header, reqAndResp.response.Header} {
 		contentTypeHeader := headers.Get("Content-Type")
 		mediaType, _, err := mime.ParseMediaType(contentTypeHeader)
 		if err == nil && mediaType == "application/json" {
@@ -21,20 +21,29 @@ func isJson(req_and_resp *httpRequestAndResponse) bool {
 		}
 	}
 
-	bodyBytes, err := io.ReadAll(req_and_resp.request.Body)
-	req_and_resp.request.Body = io.NopCloser(io.MultiReader(bytes.NewReader(bodyBytes)))
-	if err != nil {
-		return false
-	}
-	var v map[string]interface{}
-	if json.Unmarshal(bodyBytes, &v) == nil {
-		return true
+	if reqAndResp.request.ContentLength <= maxContentLength {
+		bodyBytes, err := io.ReadAll(reqAndResp.request.Body)
+		reqAndResp.request.Body = io.NopCloser(io.MultiReader(bytes.NewReader(bodyBytes)))
+		if err != nil {
+			return false
+		}
+		var v map[string]interface{}
+		if json.Unmarshal(bodyBytes, &v) == nil {
+			return true
+		}
 	}
 
-	bodyBytes, err = io.ReadAll(req_and_resp.response.Body)
-	req_and_resp.response.Body = io.NopCloser(io.MultiReader(bytes.NewReader(bodyBytes)))
-	if err != nil {
-		return false
+	if reqAndResp.response.ContentLength <= maxContentLength {
+		bodyBytes, err := io.ReadAll(reqAndResp.response.Body)
+		reqAndResp.response.Body = io.NopCloser(io.MultiReader(bytes.NewReader(bodyBytes)))
+		if err != nil {
+			return false
+		}
+		var v map[string]interface{}
+		if json.Unmarshal(bodyBytes, &v) == nil {
+			return true
+		}
 	}
-	return json.Unmarshal(bodyBytes, &v) == nil
+
+	return false
 }
