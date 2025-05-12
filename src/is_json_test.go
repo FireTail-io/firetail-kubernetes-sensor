@@ -110,7 +110,7 @@ func TestIsJson(t *testing.T) {
 		{
 			name:             "No content-type headers with request payload longer than max length",
 			reqContentType:   "",
-			reqBody:          strings.Repeat("a", 1025),
+			reqBody:          `{"key": "` + strings.Repeat("a", 1025) + `"}`,
 			respContentType:  "",
 			respBody:         ``,
 			maxContentLength: 1024,
@@ -121,7 +121,7 @@ func TestIsJson(t *testing.T) {
 			reqContentType:   "",
 			reqBody:          ``,
 			respContentType:  "",
-			respBody:         strings.Repeat("a", 1025),
+			respBody:         `{"key": "` + strings.Repeat("a", 1025) + `"}`,
 			maxContentLength: 1024,
 			expectedResult:   false,
 		},
@@ -156,8 +156,9 @@ func TestIsJson(t *testing.T) {
 			}
 
 			resp := &http.Response{
-				Header: make(http.Header),
-				Body:   io.NopCloser(strings.NewReader(tt.respBody)),
+				Header:        make(http.Header),
+				Body:          io.NopCloser(strings.NewReader(tt.respBody)),
+				ContentLength: int64(len(tt.respBody)),
 			}
 			if tt.respContentType != "" {
 				resp.Header.Set("Content-Type", tt.respContentType)
