@@ -53,6 +53,8 @@ func (s *bidirectionalStream) run() {
 
 	requestChannel := make(chan *http.Request, 1)
 	responseChannel := make(chan *http.Response, 1)
+	defer close(requestChannel)
+	defer close(responseChannel)
 
 	go func() {
 		reader := bufio.NewReader(&s.clientToServer)
@@ -101,8 +103,6 @@ func (s *bidirectionalStream) run() {
 
 	capturedRequest := <-requestChannel
 	capturedResponse := <-responseChannel
-	close(requestChannel)
-	close(responseChannel)
 
 	*s.requestAndResponseChannel <- httpRequestAndResponse{
 		request:  capturedRequest,
