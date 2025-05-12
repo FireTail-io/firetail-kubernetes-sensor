@@ -88,6 +88,14 @@ func TestIsJson(t *testing.T) {
 			respBody:        `{"key": "value"`,
 			expectedResult:  false,
 		},
+		{
+			name:            "Content-type geo+json in request with invalid body",
+			reqContentType:  "application/geo+json",
+			reqBody:         ``,
+			respContentType: "",
+			respBody:        ``,
+			expectedResult:  true,
+		},
 	}
 
 	for _, tt := range tests {
