@@ -6,12 +6,17 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"strings"
 )
 
 func isJson(req_and_resp *httpRequestAndResponse) bool {
 	for _, headers := range []http.Header{req_and_resp.request.Header, req_and_resp.response.Header} {
-		mediaType, _, err := mime.ParseMediaType(headers.Get("Content-Type"))
+		contentTypeHeader := headers.Get("Content-Type")
+		mediaType, _, err := mime.ParseMediaType(contentTypeHeader)
 		if err == nil && mediaType == "application/json" {
+			return true
+		}
+		if strings.HasSuffix(mediaType, "+json") {
 			return true
 		}
 	}
