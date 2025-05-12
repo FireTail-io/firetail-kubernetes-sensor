@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"sync"
 
@@ -57,11 +58,16 @@ func (s *bidirectionalStream) run() {
 	defer close(responseChannel)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Warn("Recovered from panic in clientToServer reader:", "Err", r)
+			}
+			wg.Done()
+		}()
 		reader := bufio.NewReader(&s.clientToServer)
 		for {
 			request, err := http.ReadRequest(reader)
 			if err == io.EOF {
-				wg.Done()
 				return
 			} else if err != nil {
 				continue
@@ -80,11 +86,16 @@ func (s *bidirectionalStream) run() {
 	}()
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Warn("Recovered from panic in serverToClient reader:", "Err", r)
+			}
+			wg.Done()
+		}()
 		reader := bufio.NewReader(&s.serverToClient)
 		for {
 			response, err := http.ReadResponse(reader, nil)
 			if err == io.ErrUnexpectedEOF {
-				wg.Done()
 				return
 			} else if err != nil {
 				continue
