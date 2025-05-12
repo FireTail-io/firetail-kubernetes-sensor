@@ -112,8 +112,22 @@ func (s *bidirectionalStream) run() {
 
 	wg.Wait()
 
-	capturedRequest := <-requestChannel
-	capturedResponse := <-responseChannel
+	var capturedRequest *http.Request
+	var capturedResponse *http.Response
+
+	select {
+	case capturedRequest = <-requestChannel:
+	default:
+		slog.Warn("No request captured")
+		return
+	}
+
+	select {
+	case capturedResponse = <-responseChannel:
+	default:
+		slog.Warn("No response captured")
+		return
+	}
 
 	*s.requestAndResponseChannel <- httpRequestAndResponse{
 		request:  capturedRequest,
