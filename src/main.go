@@ -124,6 +124,10 @@ func main() {
 				"SrcPort", requestAndResponse.srcPort,
 				"DstPort", requestAndResponse.dstPort,
 			)
+			requestAndResponse.request.Header.Set(
+				"Content-Length", strconv.Itoa(int(requestAndResponse.request.ContentLength)),
+			)
+			requestAndResponse.request.Header.Set("Host", requestAndResponse.request.Host)
 			firetailMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(requestAndResponse.response.StatusCode)
 				for key, values := range requestAndResponse.response.Header {
@@ -131,6 +135,9 @@ func main() {
 						w.Header().Add(key, value)
 					}
 				}
+				requestAndResponse.response.Header.Set(
+					"Content-Length", strconv.Itoa(int(requestAndResponse.response.ContentLength)),
+				)
 				capturedResponseBody, err := io.ReadAll(requestAndResponse.response.Body)
 				if err != nil {
 					slog.Error("Error reading request body:", "err", err.Error())
