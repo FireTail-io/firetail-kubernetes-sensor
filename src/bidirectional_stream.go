@@ -71,7 +71,7 @@ func (s *bidirectionalStream) run() {
 		defer s.clientToServer.Close()
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Warn("Recovered from panic in clientToServer reader:", "Err", r)
+				slog.Error("Recovered from panic in clientToServer reader:", "Err", r)
 			}
 		}()
 		reader := bufio.NewReader(&s.clientToServer)
@@ -102,7 +102,7 @@ func (s *bidirectionalStream) run() {
 		defer s.serverToClient.Close()
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Warn("Recovered from panic in serverToClient reader:", "Err", r)
+				slog.Error("Recovered from panic in serverToClient reader:", "Err", r)
 			}
 		}()
 		reader := bufio.NewReader(&s.serverToClient)
