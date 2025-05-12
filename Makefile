@@ -23,4 +23,5 @@ dev: build-dev
 		-e FIRETAIL_KUBERNETES_SENSOR_DEV_MODE=true \
 		-e FIRETAIL_KUBERNETES_SENSOR_DEV_SERVER_ENABLED=true \
 		-e DISABLE_SERVICE_IP_FILTERING=true \
+		-e ENABLE_ONLY_LOG_JSON=true \
 		firetail/kubernetes-sensor-dev

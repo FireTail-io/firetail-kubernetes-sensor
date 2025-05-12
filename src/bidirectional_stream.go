@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"sync"
 
@@ -53,13 +54,20 @@ func (s *bidirectionalStream) run() {
 
 	requestChannel := make(chan *http.Request, 1)
 	responseChannel := make(chan *http.Response, 1)
+	defer close(requestChannel)
+	defer close(responseChannel)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Warn("Recovered from panic in clientToServer reader:", "Err", r)
+			}
+			wg.Done()
+		}()
 		reader := bufio.NewReader(&s.clientToServer)
 		for {
 			request, err := http.ReadRequest(reader)
 			if err == io.EOF {
-				wg.Done()
 				return
 			} else if err != nil {
 				continue
@@ -78,11 +86,16 @@ func (s *bidirectionalStream) run() {
 	}()
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Warn("Recovered from panic in serverToClient reader:", "Err", r)
+			}
+			wg.Done()
+		}()
 		reader := bufio.NewReader(&s.serverToClient)
 		for {
 			response, err := http.ReadResponse(reader, nil)
 			if err == io.ErrUnexpectedEOF {
-				wg.Done()
 				return
 			} else if err != nil {
 				continue
@@ -99,10 +112,48 @@ func (s *bidirectionalStream) run() {
 
 	wg.Wait()
 
-	capturedRequest := <-requestChannel
-	capturedResponse := <-responseChannel
-	close(requestChannel)
-	close(responseChannel)
+	var capturedRequest *http.Request
+	var capturedResponse *http.Response
+
+	select {
+	case capturedRequest = <-requestChannel:
+	default:
+	}
+
+	select {
+	case capturedResponse = <-responseChannel:
+	default:
+	}
+
+	if capturedRequest == nil && capturedResponse == nil {
+		slog.Debug(
+			"No request or response captured from stream",
+			"Src", s.net.Src().String(),
+			"Dst", s.net.Dst().String(),
+			"SrcPort", s.transport.Src().String(),
+			"DstPort", s.transport.Dst().String(),
+		)
+	} else if capturedRequest == nil {
+		slog.Warn(
+			"Captured response but no request from stream",
+			"Src", s.net.Src().String(),
+			"Dst", s.net.Dst().String(),
+			"SrcPort", s.transport.Src().String(),
+			"DstPort", s.transport.Dst().String(),
+		)
+	} else if capturedResponse == nil {
+		slog.Warn(
+			"Captured request but no response from stream",
+			"Src", s.net.Src().String(),
+			"Dst", s.net.Dst().String(),
+			"SrcPort", s.transport.Src().String(),
+			"DstPort", s.transport.Dst().String(),
+		)
+	}
+
+	if capturedRequest == nil || capturedResponse == nil {
+		return
+	}
 
 	*s.requestAndResponseChannel <- httpRequestAndResponse{
 		request:  capturedRequest,
