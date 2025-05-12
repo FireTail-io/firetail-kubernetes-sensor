@@ -4,6 +4,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/google/gopacket"
@@ -25,6 +26,7 @@ type httpRequestAndResponseStreamer struct {
 	bpfExpression             string
 	requestAndResponseChannel *chan httpRequestAndResponse
 	ipManager                 *serviceIpManager
+	maxBodySize               int64
 }
 
 func (s *httpRequestAndResponseStreamer) start() {
@@ -42,8 +44,9 @@ func (s *httpRequestAndResponseStreamer) start() {
 	assembler := tcpassembly.NewAssembler(
 		tcpassembly.NewStreamPool(
 			&bidirectionalStreamFactory{
-				conns:                     make(map[string]*bidirectionalStream),
+				conns:                     &sync.Map{},
 				requestAndResponseChannel: s.requestAndResponseChannel,
+				maxBodySize:               s.maxBodySize,
 			},
 		),
 	)

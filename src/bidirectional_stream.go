@@ -17,6 +17,7 @@ import (
 type bidirectionalStreamFactory struct {
 	conns                     map[string]*bidirectionalStream
 	requestAndResponseChannel *chan httpRequestAndResponse
+	maxBodySize               int64
 }
 
 func (f *bidirectionalStreamFactory) New(netFlow, tcpFlow gopacket.Flow) tcpassembly.Stream {
@@ -33,6 +34,7 @@ func (f *bidirectionalStreamFactory) New(netFlow, tcpFlow gopacket.Flow) tcpasse
 		clientToServer:            tcpreader.NewReaderStream(),
 		serverToClient:            tcpreader.NewReaderStream(),
 		requestAndResponseChannel: f.requestAndResponseChannel,
+		maxBodySize: f.maxBodySize,
 	}
 	f.conns[fmt.Sprint(key)] = s
 	go s.run()
@@ -46,6 +48,7 @@ type bidirectionalStream struct {
 	clientToServer            tcpreader.ReaderStream
 	serverToClient            tcpreader.ReaderStream
 	requestAndResponseChannel *chan httpRequestAndResponse
+	maxBodySize               int64
 }
 
 func (s *bidirectionalStream) run() {
@@ -74,12 +77,14 @@ func (s *bidirectionalStream) run() {
 			}
 			// RemoteAddr is not filled in by ReadRequest so we have to populate it ourselves
 			request.RemoteAddr = fmt.Sprintf("%s:%s", s.net.Src().String(), s.transport.Src().String())
-			responseBody := make([]byte, request.ContentLength)
-			if request.ContentLength > 0 {
-				io.ReadFull(request.Body, responseBody)
+			if request.ContentLength > 0 && request.ContentLength < s.maxBodySize {
+				responseBody := make([]byte, request.ContentLength)
+				if request.ContentLength > 0 {
+					io.ReadFull(request.Body, responseBody)
+				}
+				request.Body.Close()
+				request.Body = io.NopCloser(bytes.NewReader(responseBody))
 			}
-			request.Body.Close()
-			request.Body = io.NopCloser(bytes.NewReader(responseBody))
 			requestChannel <- request
 
 		}
@@ -100,12 +105,14 @@ func (s *bidirectionalStream) run() {
 			} else if err != nil {
 				continue
 			}
-			responseBody := make([]byte, response.ContentLength)
-			if response.ContentLength > 0 {
-				io.ReadFull(response.Body, responseBody)
+			if response.ContentLength > 0 && response.ContentLength < s.maxBodySize {
+				responseBody := make([]byte, response.ContentLength)
+				if response.ContentLength > 0 {
+					io.ReadFull(response.Body, responseBody)
+				}
+				response.Body.Close()
+				response.Body = io.NopCloser(bytes.NewReader(responseBody))
 			}
-			response.Body.Close()
-			response.Body = io.NopCloser(bytes.NewReader(responseBody))
 			responseChannel <- response
 		}
 	}()
