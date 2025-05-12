@@ -93,7 +93,7 @@ func main() {
 				)
 				continue
 			}
-			if onlyLogJson && !isJson(requestAndResponse.request) {
+			if onlyLogJson && !isJson(&requestAndResponse) {
 				slog.Debug(
 					"Ignoring non-JSON request:",
 					"Src", requestAndResponse.src,
