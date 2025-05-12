@@ -118,14 +118,40 @@ func (s *bidirectionalStream) run() {
 	select {
 	case capturedRequest = <-requestChannel:
 	default:
-		slog.Warn("No request captured")
-		return
 	}
 
 	select {
 	case capturedResponse = <-responseChannel:
 	default:
-		slog.Warn("No response captured")
+	}
+
+	if capturedRequest == nil && capturedResponse == nil {
+		slog.Debug(
+			"No request or response captured from stream",
+			"Src", s.net.Src().String(),
+			"Dst", s.net.Dst().String(),
+			"SrcPort", s.transport.Src().String(),
+			"DstPort", s.transport.Dst().String(),
+		)
+	} else if capturedRequest == nil {
+		slog.Warn(
+			"Captured response but no request from stream",
+			"Src", s.net.Src().String(),
+			"Dst", s.net.Dst().String(),
+			"SrcPort", s.transport.Src().String(),
+			"DstPort", s.transport.Dst().String(),
+		)
+	} else if capturedResponse == nil {
+		slog.Warn(
+			"Captured request but no response from stream",
+			"Src", s.net.Src().String(),
+			"Dst", s.net.Dst().String(),
+			"SrcPort", s.transport.Src().String(),
+			"DstPort", s.transport.Dst().String(),
+		)
+	}
+
+	if capturedRequest == nil || capturedResponse == nil {
 		return
 	}
 
