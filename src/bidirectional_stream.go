@@ -15,16 +15,17 @@ import (
 )
 
 type bidirectionalStreamFactory struct {
-	conns                     map[string]*bidirectionalStream
+	conns                     *sync.Map
 	requestAndResponseChannel *chan httpRequestAndResponse
+	maxBodySize               int64
 }
 
 func (f *bidirectionalStreamFactory) New(netFlow, tcpFlow gopacket.Flow) tcpassembly.Stream {
 	key := netFlow.FastHash() ^ tcpFlow.FastHash()
 
 	// The second time we see the same connection, it will be from the server to the client
-	if conn, ok := f.conns[fmt.Sprint(key)]; ok {
-		return &conn.serverToClient
+	if conn, ok := f.conns.LoadAndDelete(fmt.Sprint(key)); ok {
+		return &conn.(*bidirectionalStream).serverToClient
 	}
 
 	s := &bidirectionalStream{
@@ -33,8 +34,12 @@ func (f *bidirectionalStreamFactory) New(netFlow, tcpFlow gopacket.Flow) tcpasse
 		clientToServer:            tcpreader.NewReaderStream(),
 		serverToClient:            tcpreader.NewReaderStream(),
 		requestAndResponseChannel: f.requestAndResponseChannel,
+		closeCallback: func() {
+			f.conns.Delete(fmt.Sprint(key))
+		},
+		maxBodySize: f.maxBodySize,
 	}
-	f.conns[fmt.Sprint(key)] = s
+	f.conns.Store(fmt.Sprint(key), s)
 	go s.run()
 
 	// The first time we see the connection, it will be from the client to the server
@@ -46,9 +51,13 @@ type bidirectionalStream struct {
 	clientToServer            tcpreader.ReaderStream
 	serverToClient            tcpreader.ReaderStream
 	requestAndResponseChannel *chan httpRequestAndResponse
+	closeCallback             func()
+	maxBodySize               int64
 }
 
 func (s *bidirectionalStream) run() {
+	defer s.closeCallback()
+
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 
@@ -58,56 +67,47 @@ func (s *bidirectionalStream) run() {
 	defer close(responseChannel)
 
 	go func() {
+		defer wg.Done()
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Warn("Recovered from panic in clientToServer reader:", "Err", r)
+				slog.Error("Recovered from panic in clientToServer reader:", "Err", r)
 			}
-			wg.Done()
 		}()
-		reader := bufio.NewReader(&s.clientToServer)
-		for {
-			request, err := http.ReadRequest(reader)
-			if err == io.EOF {
-				return
-			} else if err != nil {
-				continue
-			}
-			// RemoteAddr is not filled in by ReadRequest so we have to populate it ourselves
-			request.RemoteAddr = fmt.Sprintf("%s:%s", s.net.Src().String(), s.transport.Src().String())
-			responseBody := make([]byte, request.ContentLength)
-			if request.ContentLength > 0 {
-				io.ReadFull(request.Body, responseBody)
-			}
-			request.Body.Close()
-			request.Body = io.NopCloser(bytes.NewReader(responseBody))
-			requestChannel <- request
-
+		requestBytes := make([]byte, s.maxBodySize)
+		bytesRead, err := io.ReadFull(&s.clientToServer, requestBytes)
+		if err != nil && err != io.ErrUnexpectedEOF {
+			slog.Debug("Failed to read request bytes from stream:", "Err", err.Error(), "BytesRead", bytesRead)
+			return
 		}
+		request, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(requestBytes)))
+		if err != nil {
+			slog.Debug("Failed to read request bytes:", "Err", err.Error())
+			return
+		}
+		// RemoteAddr is not filled in by ReadRequest so we have to populate it ourselves
+		request.RemoteAddr = fmt.Sprintf("%s:%s", s.net.Src().String(), s.transport.Src().String())
+		requestChannel <- request
 	}()
 
 	go func() {
+		defer wg.Done()
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Warn("Recovered from panic in serverToClient reader:", "Err", r)
+				slog.Error("Recovered from panic in serverToClient reader:", "Err", r)
 			}
-			wg.Done()
 		}()
-		reader := bufio.NewReader(&s.serverToClient)
-		for {
-			response, err := http.ReadResponse(reader, nil)
-			if err == io.ErrUnexpectedEOF {
-				return
-			} else if err != nil {
-				continue
-			}
-			responseBody := make([]byte, response.ContentLength)
-			if response.ContentLength > 0 {
-				io.ReadFull(response.Body, responseBody)
-			}
-			response.Body.Close()
-			response.Body = io.NopCloser(bytes.NewReader(responseBody))
-			responseChannel <- response
+		responseBytes := make([]byte, s.maxBodySize)
+		bytesRead, err := io.ReadFull(&s.serverToClient, responseBytes)
+		if err != nil && err != io.ErrUnexpectedEOF {
+			slog.Debug("Failed to read response bytes from stream:", "Err", err.Error(), "BytesRead", bytesRead)
+			return
 		}
+		response, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(responseBytes)), nil)
+		if err != nil {
+			slog.Debug("Failed to read response bytes:", "Err", err.Error())
+			return
+		}
+		responseChannel <- response
 	}()
 
 	wg.Wait()
