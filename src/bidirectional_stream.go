@@ -24,7 +24,7 @@ func (f *bidirectionalStreamFactory) New(netFlow, tcpFlow gopacket.Flow) tcpasse
 	key := netFlow.FastHash() ^ tcpFlow.FastHash()
 
 	// The second time we see the same connection, it will be from the server to the client
-	if conn, ok := f.conns.Load(fmt.Sprint(key)); ok {
+	if conn, ok := f.conns.LoadAndDelete(fmt.Sprint(key)); ok {
 		return &conn.(*bidirectionalStream).serverToClient
 	}
 
