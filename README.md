@@ -1,14 +1,18 @@
 # Firetail Kubernetes Sensor
 
-POC for a FireTail Kubernetes Sensor.
+## Deployment
 
-
+- Create an API & API Key on the FireTail Platform 
+- API: [https://www.firetail.ai/docs/create-an-api](https://www.firetail.ai/docs/create-an-api)
+- API Token: [https://www.firetail.ai/docs/create-an-api-token](https://www.firetail.ai/docs/create-an-api-token)
+- ```git clone https://github.com/FireTail-io/firetail-kubernetes-sensor.git```
+- deploy helm chart ```cd helm && helm install firetail-sensor firetail-sensor/ --set apiKey="PS-02-XXXXXXXX"```
 
 ## Environment Variables
 
-| Variable Name                                   | Required? | Example                                                      | Description                                                  |
-| ----------------------------------------------- | --------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| `FIRETAIL_API_TOKEN`                            | ✅         | `PS-02-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX` | The API token the sensor will use to report logs to FireTail |
+| Variable Name                                   | Required?   | Example                                                      | Description                                                    |
+| ----------------------------------------------- | ---------   | ------------------------------------------------------------ | ------------------------------------------------------------   |
+| `FIRETAIL_API_TOKEN`                            | ✅         | `PS-02-XXXXXXXX`                                             | The API token the sensor will use to report logs to FireTail  |
 | `BPF_EXPRESSION`                                | ❌         | `tcp and (port 80 or port 443)`                              | The BPF filter used by the sensor. See docs for syntax info: https://www.tcpdump.org/manpages/pcap-filter.7.html |
 | `MAX_CONTENT_LENGTH`                            | ❌         | `1048576`                                                    | The sensor will only read request or response bodies if their length is less than `MAX_CONTENT_LENGTH` bytes. |
 | `ENABLE_ONLY_LOG_JSON`                          | ❌         | `true`                                                       | Enables only logging requests where the content-type implies the payload should be JSON, or the payload is valid JSON regardless of the content-type. |
@@ -44,16 +48,6 @@ Hello, world!
 
 After a few seconds, you should see logs appear in the FireTail SaaS platform.
 
-
-
-## Publishing to ECS
-
-Authenticate and then use the `publish` target in [the provided makefile](./Makefile) to login to ECS, tag the image and push it:
-
-```bash
-ftauth
-make publish VERSION=latest
-```
 
 
 
