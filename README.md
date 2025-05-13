@@ -6,7 +6,7 @@
 - API: [https://www.firetail.ai/docs/create-an-api](https://www.firetail.ai/docs/create-an-api)
 - API Token: [https://www.firetail.ai/docs/create-an-api-token](https://www.firetail.ai/docs/create-an-api-token)
 - ```git clone https://github.com/FireTail-io/firetail-kubernetes-sensor.git```
-- deploy helm chart ```helm install firetail-sensor firetail-sensor/ --set apiKey="PS-02-XXXXXXXX"```
+- deploy helm chart ```cd helm && helm install firetail-sensor firetail-sensor/ --set apiKey="PS-02-XXXXXXXX"```
 
 ## Environment Variables
 
