@@ -1,8 +1,11 @@
 # Firetail Kubernetes Sensor
 
-POC for a FireTail Kubernetes Sensor.
+FireTail Kubernetes Sensor.
 
+## Deployment
 
+- Create an API & API Key on the FireTail Platform (https://www.firetail.ai/docs/create-an-api-token)[https://www.firetail.ai/docs/create-an-api-token]
+- deploy helm chart ```helm install firetail-sensor-helm firetail-sensor/ --set apiKey="example"```
 
 ## Environment Variables
 
@@ -44,16 +47,6 @@ Hello, world!
 
 After a few seconds, you should see logs appear in the FireTail SaaS platform.
 
-
-
-## Publishing to ECS
-
-Authenticate and then use the `publish` target in [the provided makefile](./Makefile) to login to ECS, tag the image and push it:
-
-```bash
-ftauth
-make publish VERSION=latest
-```
 
 
 
