@@ -4,7 +4,7 @@ FireTail Kubernetes Sensor.
 
 ## Deployment
 
-- Create an API & API Key on the FireTail Platform (https://www.firetail.ai/docs/create-an-api-token)[https://www.firetail.ai/docs/create-an-api-token]
+- Create an API & API Key on the FireTail Platform [https://www.firetail.ai/docs/create-an-api-token](https://www.firetail.ai/docs/create-an-api-token)
 - deploy helm chart ```helm install firetail-sensor-helm firetail-sensor/ --set apiKey="example"```
 
 ## Environment Variables
