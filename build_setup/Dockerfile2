@@ -21,10 +21,10 @@ RUN apt-get update && apt-get install -y \
 COPY ./src2/go.* ./
 COPY ./src2/ssl_read.c ./
 RUN clang -O2 -g -Wall -target bpf -c ssl_read.c -o ssl_read.o
-RUN rm -rf ssl_read.c
 
 RUN go mod download
 COPY ./src2/ ./
+RUN rm -rf ssl_read.c
 RUN go build -o /dist/main .
 RUN rm -rf /src/*
 RUN chmod +x /dist/main
