@@ -3,15 +3,18 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/tcpassembly"
 	"github.com/google/gopacket/tcpassembly/tcpreader"
+	"golang.org/x/sync/semaphore"
 )
 
 type bidirectionalStreamFactory struct {
@@ -57,17 +60,22 @@ type bidirectionalStream struct {
 
 func (s *bidirectionalStream) run() {
 	defer s.closeCallback()
+	defer s.clientToServer.Close()
+	defer s.serverToClient.Close()
 
-	wg := sync.WaitGroup{}
-	wg.Add(2)
+	sem := semaphore.NewWeighted(2)
 
 	requestChannel := make(chan *http.Request, 1)
 	responseChannel := make(chan *http.Response, 1)
-	defer close(requestChannel)
-	defer close(responseChannel)
 
+	err := sem.Acquire(context.Background(), 1)
+	if err != nil {
+		slog.Error("Failed to acquire semaphore for clientToServer reader:", "Err", err.Error())
+		return
+	}
 	go func() {
-		defer wg.Done()
+		defer sem.Release(1)
+		defer close(requestChannel)
 		defer func() {
 			if r := recover(); r != nil {
 				slog.Error("Recovered from panic in clientToServer reader:", "Err", r)
@@ -89,8 +97,14 @@ func (s *bidirectionalStream) run() {
 		requestChannel <- request
 	}()
 
+	err = sem.Acquire(context.Background(), 1)
+	if err != nil {
+		slog.Error("Failed to acquire semaphore for serverToClient reader:", "Err", err.Error())
+		return
+	}
 	go func() {
-		defer wg.Done()
+		defer sem.Release(1)
+		defer close(responseChannel)
 		defer func() {
 			if r := recover(); r != nil {
 				slog.Error("Recovered from panic in serverToClient reader:", "Err", r)
@@ -110,7 +124,15 @@ func (s *bidirectionalStream) run() {
 		responseChannel <- response
 	}()
 
-	wg.Wait()
+	// Wait for both goroutines to finish with timeout of 2 minutes
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err := sem.Acquire(ctx, 2); err != nil {
+		if err != context.DeadlineExceeded {
+			slog.Error("Failed to acquire semaphore for both readers:", "Err", err.Error())
+		}
+		return
+	}
 
 	var capturedRequest *http.Request
 	var capturedResponse *http.Response
