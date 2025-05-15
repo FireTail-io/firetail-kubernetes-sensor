@@ -3,15 +3,18 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/tcpassembly"
 	"github.com/google/gopacket/tcpassembly/tcpreader"
+	"golang.org/x/sync/semaphore"
 )
 
 type bidirectionalStreamFactory struct {
@@ -25,8 +28,22 @@ func (f *bidirectionalStreamFactory) New(netFlow, tcpFlow gopacket.Flow) tcpasse
 
 	// The second time we see the same connection, it will be from the server to the client
 	if conn, ok := f.conns.LoadAndDelete(fmt.Sprint(key)); ok {
+		slog.Debug(
+			"Found existing connection, assuming this is a server to client connection",
+			"Src", netFlow.Src().String(),
+			"Dst", netFlow.Dst().String(),
+			"SrcPort", tcpFlow.Src().String(),
+			"DstPort", tcpFlow.Dst().String(),
+		)
 		return &conn.(*bidirectionalStream).serverToClient
 	}
+	slog.Debug(
+		"Found new connection, assuming this is a client to server connection",
+		"Src", netFlow.Src().String(),
+		"Dst", netFlow.Dst().String(),
+		"SrcPort", tcpFlow.Src().String(),
+		"DstPort", tcpFlow.Dst().String(),
+	)
 
 	s := &bidirectionalStream{
 		net:                       netFlow,
@@ -57,17 +74,22 @@ type bidirectionalStream struct {
 
 func (s *bidirectionalStream) run() {
 	defer s.closeCallback()
+	defer s.clientToServer.Close()
+	defer s.serverToClient.Close()
 
-	wg := sync.WaitGroup{}
-	wg.Add(2)
+	sem := semaphore.NewWeighted(2)
 
 	requestChannel := make(chan *http.Request, 1)
 	responseChannel := make(chan *http.Response, 1)
-	defer close(requestChannel)
-	defer close(responseChannel)
 
+	err := sem.Acquire(context.Background(), 1)
+	if err != nil {
+		slog.Error("Failed to acquire semaphore for clientToServer reader:", "Err", err.Error())
+		return
+	}
 	go func() {
-		defer wg.Done()
+		defer sem.Release(1)
+		defer close(requestChannel)
 		defer func() {
 			if r := recover(); r != nil {
 				slog.Error("Recovered from panic in clientToServer reader:", "Err", r)
@@ -79,7 +101,7 @@ func (s *bidirectionalStream) run() {
 			slog.Debug("Failed to read request bytes from stream:", "Err", err.Error(), "BytesRead", bytesRead)
 			return
 		}
-		request, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(requestBytes)))
+		request, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(requestBytes[:bytesRead])))
 		if err != nil {
 			slog.Debug("Failed to read request bytes:", "Err", err.Error())
 			return
@@ -89,8 +111,14 @@ func (s *bidirectionalStream) run() {
 		requestChannel <- request
 	}()
 
+	err = sem.Acquire(context.Background(), 1)
+	if err != nil {
+		slog.Error("Failed to acquire semaphore for serverToClient reader:", "Err", err.Error())
+		return
+	}
 	go func() {
-		defer wg.Done()
+		defer sem.Release(1)
+		defer close(responseChannel)
 		defer func() {
 			if r := recover(); r != nil {
 				slog.Error("Recovered from panic in serverToClient reader:", "Err", r)
@@ -102,7 +130,7 @@ func (s *bidirectionalStream) run() {
 			slog.Debug("Failed to read response bytes from stream:", "Err", err.Error(), "BytesRead", bytesRead)
 			return
 		}
-		response, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(responseBytes)), nil)
+		response, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(responseBytes[:bytesRead])), nil)
 		if err != nil {
 			slog.Debug("Failed to read response bytes:", "Err", err.Error())
 			return
@@ -110,7 +138,15 @@ func (s *bidirectionalStream) run() {
 		responseChannel <- response
 	}()
 
-	wg.Wait()
+	// Wait for both goroutines to finish with timeout of 2 minutes
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err := sem.Acquire(ctx, 2); err != nil {
+		if err != context.DeadlineExceeded {
+			slog.Error("Failed to acquire semaphore for both readers:", "Err", err.Error())
+		}
+		return
+	}
 
 	var capturedRequest *http.Request
 	var capturedResponse *http.Response

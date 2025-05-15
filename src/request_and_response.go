@@ -29,18 +29,20 @@ type httpRequestAndResponseStreamer struct {
 	maxBodySize               int64
 }
 
-func (s *httpRequestAndResponseStreamer) start() {
+func (s *httpRequestAndResponseStreamer) getHandleAndPacketsChannel() (*pcap.Handle, <-chan gopacket.Packet) {
 	handle, err := pcap.OpenLive("any", 1600, true, pcap.BlockForever)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer handle.Close()
-
 	err = handle.SetBPFFilter(s.bpfExpression)
 	if err != nil {
 		log.Fatal(err)
 	}
+	packetsChannel := gopacket.NewPacketSource(handle, handle.LinkType()).Packets()
+	return handle, packetsChannel
+}
 
+func (s *httpRequestAndResponseStreamer) start() {
 	assembler := tcpassembly.NewAssembler(
 		tcpassembly.NewStreamPool(
 			&bidirectionalStreamFactory{
@@ -50,11 +52,27 @@ func (s *httpRequestAndResponseStreamer) start() {
 			},
 		),
 	)
-	ticker := time.Tick(time.Minute)
-	packetsChannel := gopacket.NewPacketSource(handle, handle.LinkType()).Packets()
+
+	go func() {
+		ticker := time.Tick(time.Minute)
+		for {
+			select {
+			case <-ticker:
+				slog.Debug("Flushing old conns...")
+				assembler.FlushOlderThan(time.Now().Add(-2 * time.Minute))
+			}
+		}
+	}()
+
+	handler, packetsChannel := s.getHandleAndPacketsChannel()
 	for {
 		select {
-		case packet := <-packetsChannel:
+		case packet, ok := <-packetsChannel:
+			if !ok {
+				slog.Warn("Packet channel closed. Reinitializing...")
+				handler.Close()
+				handler, packetsChannel = s.getHandleAndPacketsChannel()
+			}
 			if packet.NetworkLayer() == nil || packet.TransportLayer() == nil {
 				continue
 			}
@@ -78,10 +96,14 @@ func (s *httpRequestAndResponseStreamer) start() {
 				)
 				continue
 			}
+			slog.Debug(
+				"Captured packet:",
+				"Src", src,
+				"Dst", dst,
+				"SrcPort", tcp.SrcPort.String(),
+				"DstPort", tcp.DstPort.String(),
+			)
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), tcp, packet.Metadata().Timestamp)
-		case <-ticker:
-			assembler.FlushOlderThan(time.Now().Add(-2 * time.Minute))
-		default:
 		}
 	}
 }
