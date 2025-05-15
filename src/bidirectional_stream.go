@@ -128,7 +128,9 @@ func (s *bidirectionalStream) run() {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	if err := sem.Acquire(ctx, 2); err != nil {
-		slog.Error("Failed to acquire semaphore for both readers:", "Err", err.Error())
+		if err != context.DeadlineExceeded {
+			slog.Error("Failed to acquire semaphore for both readers:", "Err", err.Error())
+		}
 		return
 	}
 
