@@ -1,7 +1,22 @@
 FROM golang:1.24-bullseye
 WORKDIR /src
 RUN apt-get update && apt-get install -y --no-install-recommends libpcap-dev
-RUN apt-get install libc6-dev
+RUN apt-get update && apt-get install -y \
+    clang \
+    llvm \
+    make \
+    gcc \
+    libelf-dev \
+    iproute2 \
+    iputils-ping \
+    git \
+    curl \
+    libbpf-dev \
+    linux-headers-$(uname -r) \
+    build-essential \
+    pkg-config \
+    zlib1g-dev
+RUN clang -O2 -g -Wall -target bpf -c ssl_read.c -o ssl_read.o
 COPY ./src2/go.* ./
 RUN go mod download
 COPY ./src2/ ./
