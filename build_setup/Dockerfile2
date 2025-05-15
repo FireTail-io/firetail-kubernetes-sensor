@@ -16,8 +16,11 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     zlib1g-dev \
     linux-headers-generic
-RUN clang -O2 -g -Wall -target bpf -c ssl_read.c -o ssl_read.o
+
 COPY ./src2/go.* ./
+COPY ./src2/ssl_read.c ./
+RUN clang -O2 -g -Wall -target bpf -c ssl_read.c -o ssl_read.o
+
 RUN go mod download
 COPY ./src2/ ./
 RUN go build -o /dist/main .
