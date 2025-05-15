@@ -24,7 +24,7 @@ RUN clang -O2 -g -Wall -target bpf -c ssl_read.c -o ssl_read.o
 
 RUN go mod download
 COPY ./src2/ ./
-RUN rm -rf ssl_read.c
+RUN go generate
 RUN go build -o /dist/main .
 RUN rm -rf /src/*
 RUN chmod +x /dist/main
