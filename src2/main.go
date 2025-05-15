@@ -9,7 +9,8 @@ import (
 	"os"
 
 	"github.com/cilium/ebpf"
-	"golang.org/x/sys/unix"
+	"github.com/cilium/ebpf/link"
+	"github.com/cilium/ebpf/ringbuf"
 )
 
 //go:embed ssl_read.o
