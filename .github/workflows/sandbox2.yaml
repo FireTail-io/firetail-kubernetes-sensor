@@ -1,0 +1,45 @@
+name: Deploy to Sandbox
+run-name: "@${{ github.triggering_actor }}: ${{ github.ref_name }}: ${{ github.event_name }}"
+on:
+  push:
+    branches:
+      - test-build
+defaults:
+  run:
+    shell: bash
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+permissions:
+  packages: write
+  contents: read
+  pull-requests: read
+jobs:
+  deploy-sandbox:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+        with:
+          fetch-depth: 2
+      - name: Build Docker image
+        run: |
+          shopt -s nocasematch
+          [[ ${GITHUB_REF_TYPE} == "tag" ]] &&
+            VERSION=${GITHUB_REF_NAME} ||
+            VERSION=$(git rev-parse --short "${COMMIT_SHA}")
+          IMAGE_NAME=ghcr.io/firetail-io/kubernetes-sensor:tb-${VERSION}
+          IMAGE_NAME=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
+        env:
+          # pull-requests don't use github.sha for some reason
+          COMMIT_SHA: ${{github.event.pull_request.head.sha || github.sha}}
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Docker image
+        run: |
+          docker build --platform linux/amd64 -f build_setup/Dockerfile2 -t $IMAGE_NAME .
+          docker push $IMAGE_NAME
