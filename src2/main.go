@@ -9,8 +9,6 @@ import (
 	"os"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/link"
-	"github.com/cilium/ebpf/ringbuf"
 	"golang.org/x/sys/unix"
 )
 
