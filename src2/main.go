@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
