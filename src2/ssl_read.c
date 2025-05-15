@@ -15,22 +15,23 @@ struct ssl_event_t {
     int num;
 };
 
-SEC("uprobe/SSL_read")
-int ssl_read_enter_v3(struct pt_regs *ctx) {
-    void *ssl = (void *)PT_REGS_PARM1(ctx);
-    void *buffer = (void *)PT_REGS_PARM2(ctx);
-    int num = (int)PT_REGS_PARM3(ctx);
-    struct ssl_event_t *event;
-    event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
-    if (!event) return 0;
+SEC("uprobe/SSL_read_v3")
+void BPF_UPROBE(ssl_read_enter_v3, void* ssl, void* buffer, int num) {     
+    __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u32 pid = pid_tgid >> 32;
+    __u64 id = pid_tgid | TLS_MASK;
+    ssl_uprobe_read_enter_v3(ctx, id, pid, ssl, buffer, num, 0);
+}
 
-    event->pid_tgid = bpf_get_current_pid_tgid();
-    event->ssl_ptr = (unsigned long)ssl;
-    event->buffer = (unsigned long)buffer;
-    event->num = num;
+SEC("uretprobe/SSL_read")
+void BPF_URETPROBE(ssl_ret_read_v3) {
+ __u64 pid_tgid = bpf_get_current_pid_tgid();
+    __u64 pid = pid_tgid >> 32;
+    __u64 id = pid_tgid | TLS_MASK;
 
-    bpf_ringbuf_submit(event, 0);
-    return 0;
+    int returnValue = PT_REGS_RC(ctx);
+
+    process_exit_of_syscalls_read_recvfrom(ctx, id, pid, returnValue, 1);
 }
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
