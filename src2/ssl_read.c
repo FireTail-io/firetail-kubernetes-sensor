@@ -23,15 +23,4 @@ void BPF_UPROBE(ssl_read_enter_v3, void* ssl, void* buffer, int num) {
     ssl_uprobe_read_enter_v3(ctx, id, pid, ssl, buffer, num, 0);
 }
 
-SEC("uretprobe/SSL_read")
-void BPF_URETPROBE(ssl_ret_read_v3) {
- __u64 pid_tgid = bpf_get_current_pid_tgid();
-    __u64 pid = pid_tgid >> 32;
-    __u64 id = pid_tgid | TLS_MASK;
-
-    int returnValue = PT_REGS_RC(ctx);
-
-    process_exit_of_syscalls_read_recvfrom(ctx, id, pid, returnValue, 1);
-}
-
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
