@@ -20,7 +20,8 @@ RUN apt-get update && apt-get install -y \
     gcc-multilib
 COPY ./src2/go.* ./
 COPY ./src2/ssl_read.c ./
-RUN clang -O2 -g -Wall -target bpf -c ssl_read.c -o ssl_read.o && rm ssl_read.c
+RUN clang -O2 -g -Wall -target bpf -c ssl_read.c -o ssl_read.o
+RUN rm -rf ssl_read.c
 
 RUN go mod download
 COPY ./src2/ ./
