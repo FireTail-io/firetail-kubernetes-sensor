@@ -87,6 +87,13 @@ func (s *httpRequestAndResponseStreamer) start() {
 				)
 				continue
 			}
+			slog.Debug(
+				"Captured packet:",
+				"Src", src,
+				"Dst", dst,
+				"SrcPort", tcp.SrcPort.String(),
+				"DstPort", tcp.DstPort.String(),
+			)
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), tcp, packet.Metadata().Timestamp)
 		case <-ticker:
 			assembler.FlushOlderThan(time.Now().Add(-2 * time.Minute))
