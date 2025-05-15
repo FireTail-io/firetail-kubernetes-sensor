@@ -16,7 +16,7 @@ struct ssl_event_t {
 };
 
 SEC("uprobe/SSL_read")
-int BPF_UPROBE(ssl_read_enter_v3, void* ssl, void* buffer, int num) {
+int ssl_read_enter_v3(void *ssl, void *buffer, int num) {
     struct ssl_event_t *event;
     event = bpf_ringbuf_reserve(&events, sizeof(*event), 0);
     if (!event) return 0;
