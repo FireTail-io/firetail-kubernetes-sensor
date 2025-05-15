@@ -30,7 +30,7 @@ type httpRequestAndResponseStreamer struct {
 }
 
 func (s *httpRequestAndResponseStreamer) getHandleAndPacketsChannel() (*pcap.Handle, <-chan gopacket.Packet) {
-	handle, err := pcap.OpenLive("any", 1600, true, 10*time.Second)
+	handle, err := pcap.OpenLive("any", 1600, true, pcap.BlockForever)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -53,9 +53,18 @@ func (s *httpRequestAndResponseStreamer) start() {
 		),
 	)
 
-	handler, packetsChannel := s.getHandleAndPacketsChannel()
+	go func() {
+		ticker := time.Tick(time.Minute)
+		for {
+			select {
+			case <-ticker:
+				slog.Debug("Flushing old conns...")
+				assembler.FlushOlderThan(time.Now().Add(-2 * time.Minute))
+			}
+		}
+	}()
 
-	ticker := time.Tick(time.Minute)
+	handler, packetsChannel := s.getHandleAndPacketsChannel()
 	for {
 		select {
 		case packet, ok := <-packetsChannel:
@@ -95,9 +104,6 @@ func (s *httpRequestAndResponseStreamer) start() {
 				"DstPort", tcp.DstPort.String(),
 			)
 			assembler.AssembleWithTimestamp(packet.NetworkLayer().NetworkFlow(), tcp, packet.Metadata().Timestamp)
-		case <-ticker:
-			assembler.FlushOlderThan(time.Now().Add(-2 * time.Minute))
-		default:
 		}
 	}
 }
