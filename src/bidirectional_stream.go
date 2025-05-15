@@ -87,7 +87,7 @@ func (s *bidirectionalStream) run() {
 			slog.Debug("Failed to read request bytes from stream:", "Err", err.Error(), "BytesRead", bytesRead)
 			return
 		}
-		request, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(requestBytes)))
+		request, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(requestBytes[:bytesRead])))
 		if err != nil {
 			slog.Debug("Failed to read request bytes:", "Err", err.Error())
 			return
@@ -116,7 +116,7 @@ func (s *bidirectionalStream) run() {
 			slog.Debug("Failed to read response bytes from stream:", "Err", err.Error(), "BytesRead", bytesRead)
 			return
 		}
-		response, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(responseBytes)), nil)
+		response, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(responseBytes[:bytesRead])), nil)
 		if err != nil {
 			slog.Debug("Failed to read response bytes:", "Err", err.Error())
 			return
