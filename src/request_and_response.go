@@ -29,18 +29,20 @@ type httpRequestAndResponseStreamer struct {
 	maxBodySize               int64
 }
 
-func (s *httpRequestAndResponseStreamer) start() {
+func (s *httpRequestAndResponseStreamer) getHandleAndPacketsChannel() (*pcap.Handle, <-chan gopacket.Packet) {
 	handle, err := pcap.OpenLive("any", 1600, true, pcap.BlockForever)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer handle.Close()
-
 	err = handle.SetBPFFilter(s.bpfExpression)
 	if err != nil {
 		log.Fatal(err)
 	}
+	packetsChannel := gopacket.NewPacketSource(handle, handle.LinkType()).Packets()
+	return handle, packetsChannel
+}
 
+func (s *httpRequestAndResponseStreamer) start() {
 	assembler := tcpassembly.NewAssembler(
 		tcpassembly.NewStreamPool(
 			&bidirectionalStreamFactory{
@@ -50,11 +52,18 @@ func (s *httpRequestAndResponseStreamer) start() {
 			},
 		),
 	)
+
+	handler, packetsChannel := s.getHandleAndPacketsChannel()
+
 	ticker := time.Tick(time.Minute)
-	packetsChannel := gopacket.NewPacketSource(handle, handle.LinkType()).Packets()
 	for {
 		select {
-		case packet := <-packetsChannel:
+		case packet, ok := <-packetsChannel:
+			if !ok {
+				slog.Warn("Packet channel closed. Reinitializing...")
+				handler.Close()
+				handler, packetsChannel = s.getHandleAndPacketsChannel()
+			}
 			if packet.NetworkLayer() == nil || packet.TransportLayer() == nil {
 				continue
 			}
