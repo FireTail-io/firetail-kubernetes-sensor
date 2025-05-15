@@ -15,8 +15,9 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     pkg-config \
     zlib1g-dev \
-    linux-headers-generic
-
+    linux-headers-generic \
+    m4 \
+    gcc-multilib
 COPY ./src2/go.* ./
 COPY ./src2/ssl_read.c ./
 RUN clang -O2 -g -Wall -target bpf -c ssl_read.c -o ssl_read.o
