@@ -28,8 +28,22 @@ func (f *bidirectionalStreamFactory) New(netFlow, tcpFlow gopacket.Flow) tcpasse
 
 	// The second time we see the same connection, it will be from the server to the client
 	if conn, ok := f.conns.LoadAndDelete(fmt.Sprint(key)); ok {
+		slog.Debug(
+			"Found existing connection, assuming this is a server to client connection",
+			"Src", netFlow.Src().String(),
+			"Dst", netFlow.Dst().String(),
+			"SrcPort", tcpFlow.Src().String(),
+			"DstPort", tcpFlow.Dst().String(),
+		)
 		return &conn.(*bidirectionalStream).serverToClient
 	}
+	slog.Debug(
+		"Found new connection, assuming this is a client to server connection",
+		"Src", netFlow.Src().String(),
+		"Dst", netFlow.Dst().String(),
+		"SrcPort", tcpFlow.Src().String(),
+		"DstPort", tcpFlow.Dst().String(),
+	)
 
 	s := &bidirectionalStream{
 		net:                       netFlow,
@@ -87,7 +101,7 @@ func (s *bidirectionalStream) run() {
 			slog.Debug("Failed to read request bytes from stream:", "Err", err.Error(), "BytesRead", bytesRead)
 			return
 		}
-		request, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(requestBytes)))
+		request, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(requestBytes[:bytesRead])))
 		if err != nil {
 			slog.Debug("Failed to read request bytes:", "Err", err.Error())
 			return
@@ -116,7 +130,7 @@ func (s *bidirectionalStream) run() {
 			slog.Debug("Failed to read response bytes from stream:", "Err", err.Error(), "BytesRead", bytesRead)
 			return
 		}
-		response, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(responseBytes)), nil)
+		response, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(responseBytes[:bytesRead])), nil)
 		if err != nil {
 			slog.Debug("Failed to read response bytes:", "Err", err.Error())
 			return
