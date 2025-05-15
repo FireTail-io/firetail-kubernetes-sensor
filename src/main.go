@@ -128,6 +128,10 @@ func main() {
 				"Content-Length", strconv.Itoa(int(requestAndResponse.request.ContentLength)),
 			)
 			requestAndResponse.request.Header.Set("Host", requestAndResponse.request.Host)
+			var responseRecorder *httptest.ResponseRecorder
+			if devEnabled {
+				responseRecorder = httptest.NewRecorder()
+			}
 			firetailMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(requestAndResponse.response.StatusCode)
 				for key, values := range requestAndResponse.response.Header {
@@ -145,9 +149,17 @@ func main() {
 				}
 				w.Write(capturedResponseBody)
 			})).ServeHTTP(
-				httptest.NewRecorder(),
+				responseRecorder,
 				requestAndResponse.request,
 			)
+			if responseRecorder != nil {
+				slog.Debug(
+					"Response from Firetail middleware:",
+					"StatusCode", responseRecorder.Code,
+					"Header", responseRecorder.Header(),
+					"Body", responseRecorder.Body.String(),
+				)
+			}
 		default:
 		}
 	}
