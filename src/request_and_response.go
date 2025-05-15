@@ -30,7 +30,7 @@ type httpRequestAndResponseStreamer struct {
 }
 
 func (s *httpRequestAndResponseStreamer) getHandleAndPacketsChannel() (*pcap.Handle, <-chan gopacket.Packet) {
-	handle, err := pcap.OpenLive("any", 1600, true, pcap.BlockForever)
+	handle, err := pcap.OpenLive("any", 1600, true, 10*time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
