@@ -15,6 +15,28 @@ import (
 )
 
 func main() {
+	maxLifetimeMinutes, err := strconv.Atoi(os.Getenv("FIRETAIL_KUBERNETES_SENSOR_LIFETIME_MINUTES"))
+	if err != nil {
+		slog.Warn(
+			"FIRETAIL_KUBERNETES_SENSOR_LIFETIME_MINUTES environment variable not set. " +
+				"This sensor will shutdown in 15 minutes.",
+		)
+		maxLifetimeMinutes = 15
+	} else {
+		if maxLifetimeMinutes > 0 {
+			slog.Warn("This sensor will shutdown in " + strconv.Itoa(maxLifetimeMinutes) + " minute(s).")
+		} else {
+			slog.Warn("Shutdown timeout disabled. This sensor will run indefinitely.")
+		}
+	}
+	if maxLifetimeMinutes > 0 {
+		go func() {
+			time.Sleep(time.Minute * time.Duration(maxLifetimeMinutes))
+			slog.Warn("Timeout reached. Shutting down the sensor...")
+			os.Exit(0)
+		}()
+	}
+
 	logsApiToken, logsApiTokenSet := os.LookupEnv("FIRETAIL_API_TOKEN")
 	if !logsApiTokenSet {
 		log.Fatal("FIRETAIL_API_TOKEN environment variable not set")
