@@ -1,5 +1,7 @@
 # Firetail Kubernetes Sensor
 
+
+
 ## Deployment
 
 - Create an API & API Key on the FireTail Platform 
@@ -7,6 +9,8 @@
 - API Token: [https://www.firetail.ai/docs/create-an-api-token](https://www.firetail.ai/docs/create-an-api-token)
 - ```git clone https://github.com/FireTail-io/firetail-kubernetes-sensor.git```
 - deploy helm chart ```cd helm && helm install firetail-sensor firetail-sensor/ --set apiKey="PS-02-XXXXXXXX"```
+
+
 
 ## Environment Variables
 
@@ -18,6 +22,7 @@
 | `ENABLE_ONLY_LOG_JSON`                          | ❌         | `true`                                                       | Enables only logging requests where the content-type implies the payload should be JSON, or the payload is valid JSON regardless of the content-type. |
 | `DISABLE_SERVICE_IP_FILTERING`                  | ❌         | `true`                                                       | Disables polling Kubernetes for the IP addresses of services & subsequently ignoring all requests captured that aren't made to one of those IPs. |
 | `FIRETAIL_API_URL`                              | ❌         | `https://api.logging.eu-west-1.prod.firetail.app/logs/bulk`  | The API url the sensor will send logs to. Defaults to the EU region production environment. |
+| `FIRETAIL_KUBERNETES_SENSOR_LIFETIME_MINUTES`   | ❌         | `15`                                                         | The maximum lifetime of the FireTail kubernetes sensor in minutes. Must be an integer. Values <=0 will disable the shutdown timer. |
 | `FIRETAIL_KUBERNETES_SENSOR_DEV_MODE`           | ❌         | `true`                                                       | Enables debug logging when set to `true`, and reduces the max age of a log in a batch to be sent to FireTail. |
 | `FIRETAIL_KUBERNETES_SENSOR_DEV_SERVER_ENABLED` | ❌         | `true`                                                       | Enables a demo web server when set to `true`; useful for sending test requests to. |
 
