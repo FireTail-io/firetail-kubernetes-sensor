@@ -4,7 +4,7 @@
 
 image:
   repository: ghcr.io/firetail-io/kubernetes-sensor
-  tag: 1dbc044
+  tag: v0.1.10
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
@@ -30,9 +30,9 @@ securityContext:
 
 
 env:
-  FIRETAIL_API_URL: "https://api.logging.eu-west-1.sandbox.firetail.app/logs/bulk"
+  FIRETAIL_API_URL: "https://api.logging.us-east-2.prod.us.firetail.app/logs/bulk"
   FIRETAIL_API_URL_EU: "https://api.logging.eu-west-1.firetail.app/logs/bulk"
-  FIRETAIL_API_URL_US: "https://api.logging.us-east-2.us.firetail.app/logs/bulk"
+  FIRETAIL_API_URL_US: "https://api.logging.us-east-2.prod.us.firetail.app/logs/bulk"
   FIRETAIL_KUBERNETES_SENSOR_DEV_MODE: "true"
   FIRETAIL_KUBERNETES_SENSOR_DEV_SERVER_ENABLED: "false"
   BPF_EXPRESSION: "tcp and (port 80 or port 443) and not net 169.254.0.0/16 and not net fd00::/8"
