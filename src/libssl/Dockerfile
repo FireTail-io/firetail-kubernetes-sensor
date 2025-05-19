@@ -16,3 +16,6 @@ ENTRYPOINT ["./probe"]
 
 # To build and run me, do:
 # docker build . -t libssl && docker run --rm -it --privileged libssl
+# Then in another terminal do:
+# docker exec -it <container_id> wget -qO- https://www.google.com
+# You should see logs about SSL connections in the first terminal.
