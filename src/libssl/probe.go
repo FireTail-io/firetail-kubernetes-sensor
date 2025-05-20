@@ -4,6 +4,7 @@ import (
 	"C"
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"os/exec"
@@ -11,8 +12,16 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
+	"github.com/cilium/ebpf/ringbuf"
 )
-import "time"
+
+type event struct {
+	Pid uint64
+	Ssl uint64
+	Buf uint64
+	Num int32
+	_   int32 // padding
+}
 
 func findLibSSL() (string, error) {
 	cmd := exec.Command("sh", "-c", fmt.Sprintf("find /usr/lib -name 'libssl.so*'"))
@@ -51,6 +60,7 @@ func main() {
 	programs := struct {
 		ProbeSslRead  *ebpf.Program `ebpf:"probe_ssl_read"`
 		ProbeSslWrite *ebpf.Program `ebpf:"probe_ssl_write"`
+		Events        *ebpf.Map     `ebpf:"events"`
 	}{}
 	err = collection.LoadAndAssign(&programs, nil)
 	if err != nil {
@@ -72,11 +82,24 @@ func main() {
 	}
 	defer sslWriteLink.Close()
 
-	t := time.NewTicker(time.Second)
+	ringbufReader, err := ringbuf.NewReader(programs.Events)
+	if err != nil {
+		log.Fatalf("Err opening ringbuf: %v", err)
+	}
+	defer ringbufReader.Close()
+
 	for {
-		select {
-		case <-t.C:
-			log.Println("Running...")
+		record, err := ringbufReader.Read()
+		if err != nil {
+			log.Printf("reading ringbuf: %v", err)
+			continue
 		}
+		var e event
+		err = binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &e)
+		if err != nil {
+			log.Printf("parsing event: %v", err)
+			continue
+		}
+		fmt.Printf("SSL_read(pid=%d, ssl=0x%x, buf=0x%x, num=%d)\n", e.Pid, e.Ssl, e.Buf, e.Num)
 	}
 }
