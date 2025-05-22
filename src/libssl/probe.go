@@ -102,10 +102,10 @@ func main() {
 		}
 		log.Printf("📗 SSL_read(pid=%d, ssl=0x%x, buf=0x%x, num=%d)\n", e.Pid, e.Ssl, e.Buf, e.Num)
 		log.Println(
-			"📖 Buffer content:",
-			"\n--------------------START--------------------\n",
-			string(bytes.Trim(e.BufContent[:], "\x00")),
-			"\n---------------------END---------------------\n",
+			"📖 Buffer content:" +
+				"\n--------------------START--------------------\n" +
+				string(bytes.Trim(e.BufContent[4:], "\x00")) +
+				"\n---------------------END---------------------\n",
 		)
 	}
 }
