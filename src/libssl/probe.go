@@ -4,7 +4,6 @@ import (
 	"C"
 	"bufio"
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"log"
 	"os/exec"
@@ -14,13 +13,14 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 )
+import "encoding/binary"
 
 type event struct {
-	Pid uint64
-	Ssl uint64
-	Buf uint64
-	Num int32
-	_   int32 // padding
+	Pid        uint64
+	Ssl        uint64
+	Buf        uint64
+	Num        int32
+	BufContent [8192]byte
 }
 
 func findLibSSL() (string, error) {
@@ -100,6 +100,12 @@ func main() {
 			log.Printf("parsing event: %v", err)
 			continue
 		}
-		fmt.Printf("SSL_read(pid=%d, ssl=0x%x, buf=0x%x, num=%d)\n", e.Pid, e.Ssl, e.Buf, e.Num)
+		log.Printf("📗 SSL_read(pid=%d, ssl=0x%x, buf=0x%x, num=%d)\n", e.Pid, e.Ssl, e.Buf, e.Num)
+		log.Println(
+			"📖 Buffer content:",
+			"\n--------------------START--------------------\n",
+			string(bytes.Trim(e.BufContent[:], "\x00")),
+			"\n---------------------END---------------------\n",
+		)
 	}
 }
